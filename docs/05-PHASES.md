@@ -28,8 +28,8 @@ Tasks
 8. Add `docs/` with these md files and the reference images.
 
 Done when
-- [ ] App opens on the phone (Expo Go or dev build) and shows a themed blank Home.
-- [ ] Code is on GitHub.
+- [x] App opens on the phone (Expo Go or dev build) and shows a themed blank Home.
+- [x] Code is on GitHub / git repository.
 
 ---
 
