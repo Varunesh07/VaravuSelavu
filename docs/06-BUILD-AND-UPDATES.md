@@ -45,7 +45,7 @@ Use an Expo config plugin (or a small script run after `expo prebuild`) that add
 
 ## Workflow file `.github/workflows/build-apk.yml`
 Outline (the agent writes the exact YAML):
-1. Trigger: `push` to `main` and manual `workflow_dispatch`.
+1. Trigger: manual `workflow_dispatch` or push of a version tag (e.g. `v1.0.0`).
 2. Runner: `ubuntu-latest`.
 3. Steps:
    - `actions/checkout`

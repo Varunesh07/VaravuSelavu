@@ -2,13 +2,15 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
   build:
     name: Build Signed Release APK
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write
 
@@ -67,22 +69,22 @@ jobs:
           mkdir -p build-output
           APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
           if [ -f "$APK_PATH" ]; then
-            cp "$APK_PATH" "build-output/Varavuselavu-v1.0.0-${{ github.run_number }}.apk"
+            TAG_OR_RUN="${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.0-{0}', github.run_number) }}"
+            cp "$APK_PATH" "build-output/Varavuselavu-${TAG_OR_RUN}.apk"
           fi
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Varavuselavu-v1.0.0-${{ github.run_number }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Varavuselavu-{0}', github.ref_name) || format('Varavuselavu-v1.0.0-{0}', github.run_number) }}
           path: build-output/*.apk
           retention-days: 14
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/heads/main')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-${{ github.run_number }}
-          name: Varavuselavu v1.0.0 (Build ${{ github.run_number }})
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v1.0.0-{0}', github.run_number) }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && format('Varavuselavu {0}', github.ref_name) || format('Varavuselavu v1.0.0 (Build {0})', github.run_number) }}
           files: build-output/*.apk
           draft: false
           prerelease: false
