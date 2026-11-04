@@ -45,3 +45,6 @@ keystore.b64
 # generated native folders
 /ios
 /android
+
+# Documentation (local only)
+docs/
