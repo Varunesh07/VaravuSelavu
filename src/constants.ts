@@ -26,3 +26,4 @@ export const DEFAULT_CATEGORIES: DefaultCategory[] = [
   { name: 'Outings & fun', type: 'out', icon: 'game-controller', color: '#EAB308', sortOrder: 9 },
   { name: 'Others', type: 'out', icon: 'ellipsis-horizontal', color: '#94A3B8', sortOrder: 10 },
 ];
+

@@ -11,3 +11,4 @@ export const useThemeStore = create<ThemeState>((set) => ({
   themeMode: 'system',
   setThemeMode: (mode) => set({ themeMode: mode }),
 }));
+

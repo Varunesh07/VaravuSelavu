@@ -41,3 +41,4 @@ export const darkColors: ColorTokens = {
 };
 
 export const balanceCardGradient = ['#4C1D95', '#7C3AED'] as const;
+
