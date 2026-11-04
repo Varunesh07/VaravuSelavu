@@ -26,6 +26,9 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v3
+
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
@@ -36,15 +39,14 @@ jobs:
         run: npx expo prebuild --platform android --no-install
 
       - name: Configure Keystore and Signing
-        if: env.KEYSTORE_BASE64 != ''
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
-          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> $GITHUB_ENV
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+            echo "KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> $GITHUB_ENV
+          fi
+          node scripts/apply-signing.js
 
       - name: Build Android Release APK
         env:
@@ -61,7 +63,7 @@ jobs:
       - name: Package and Rename APK
         run: |
           mkdir -p build-output
-          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          APK_PATH=$(find android/app/build/outputs/apk -name "*.apk" | head -n 1)
           if [ -f "$APK_PATH" ]; then
             cp "$APK_PATH" "build-output/Varavuselavu-v1.0.0-${{ github.run_number }}.apk"
           fi
@@ -84,4 +86,3 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

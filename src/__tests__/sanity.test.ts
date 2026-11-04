@@ -21,3 +21,4 @@ describe('Sanity & Configuration Tests', () => {
     expect(lightColors.accent).toBe('#F97316');
   });
 });
+
