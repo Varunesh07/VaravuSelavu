@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -54,8 +55,38 @@ export default function AddTransactionScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickerDate, setPickerDate] = useState(new Date());
 
-  // Submitting state
+  // Keyboard and Scroll management
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const scrollViewRef = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const isNoteFocusedRef = useRef(false);
+
+  // Submitting state with double-tap guard
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
+
+  // Keyboard listener to keep focused note field visible
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
+      if (isNoteFocusedRef.current) {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      }
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Load categories and transaction data (if editing)
   useEffect(() => {
@@ -170,9 +201,10 @@ export default function AddTransactionScreen() {
   const isValidAmount = !isNaN(amountNumber) && amountNumber > 0;
   const canSave = isValidAmount && selectedCategoryId !== null && !isSubmitting;
 
-  // Save handler
+  // Save handler with synchronous double-tap block and error recovery
   const handleSave = async () => {
-    if (!canSave) return;
+    if (!canSave || isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     try {
@@ -200,8 +232,9 @@ export default function AddTransactionScreen() {
       bumpDataVersion();
       router.back();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save transaction.');
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
+      Alert.alert('Error', err.message || 'Failed to save transaction.');
     }
   };
 
@@ -235,10 +268,14 @@ export default function AddTransactionScreen() {
   const isToday = dateStr === getTodayDateString();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={isKeyboardVisible ? ['top'] : ['top', 'bottom']}
+    >
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
       >
         {/* Header */}
         <View style={[styles.header, { paddingHorizontal: spacing.screenPadding, borderBottomColor: colors.border }]}>
@@ -268,9 +305,18 @@ export default function AddTransactionScreen() {
         </View>
 
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scroll}
-          contentContainerStyle={[styles.scrollContent, { paddingHorizontal: spacing.screenPadding }]}
+          contentContainerStyle={[
+            styles.scrollContent,
+            {
+              paddingHorizontal: spacing.screenPadding,
+              paddingBottom: isKeyboardVisible ? 36 : 16,
+            },
+          ]}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         >
           {/* Segmented Type Toggle */}
           <View style={[styles.typeToggleContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -345,6 +391,10 @@ export default function AddTransactionScreen() {
                   if (/^\d*\.?\d{0,2}$/.test(val)) {
                     setAmountStr(val);
                   }
+                }}
+                onFocus={() => {
+                  isNoteFocusedRef.current = false;
+                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
                 }}
                 placeholder="0"
                 placeholderTextColor={colors.textMuted}
@@ -509,6 +559,21 @@ export default function AddTransactionScreen() {
               maxLength={200}
               placeholder="e.g. Chai, metro recharge, snacks..."
               placeholderTextColor={colors.textMuted}
+              onFocus={() => {
+                isNoteFocusedRef.current = true;
+                setTimeout(() => {
+                  scrollViewRef.current?.scrollToEnd({ animated: true });
+                }, 100);
+              }}
+              onBlur={() => {
+                isNoteFocusedRef.current = false;
+              }}
+              onContentSizeChange={() => {
+                if (isNoteFocusedRef.current) {
+                  scrollViewRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
+              scrollEnabled={false}
               style={[
                 styles.noteInput,
                 typography.body,
@@ -528,12 +593,13 @@ export default function AddTransactionScreen() {
         <View style={[styles.footer, { paddingHorizontal: spacing.screenPadding, borderTopColor: colors.border }]}>
           <Pressable
             onPress={handleSave}
-            disabled={!canSave}
-            style={[
+            disabled={!canSave || isSubmitting}
+            style={({ pressed }) => [
               styles.saveButton,
               {
-                backgroundColor: canSave ? colors.primary : colors.cardAlt,
+                backgroundColor: canSave && !isSubmitting ? colors.primary : colors.cardAlt,
                 borderRadius: radius.button,
+                opacity: pressed && canSave && !isSubmitting ? 0.8 : 1,
               },
             ]}
           >
@@ -541,7 +607,7 @@ export default function AddTransactionScreen() {
               style={[
                 typography.title,
                 {
-                  color: canSave ? '#FFFFFF' : colors.textMuted,
+                  color: canSave && !isSubmitting ? '#FFFFFF' : colors.textMuted,
                   fontSize: 16,
                   fontWeight: '600',
                 },

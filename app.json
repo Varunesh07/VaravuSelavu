@@ -15,6 +15,7 @@
     "android": {
       "package": "com.varunesh.varavuselavu",
       "versionCode": 1,
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "backgroundColor": "#7C3AED",
         "foregroundImage": "./assets/icon.png"
