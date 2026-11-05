@@ -33,16 +33,17 @@ export default function TabLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarHideOnKeyboard: true,
-        tabBarStyle: [
-          styles.floatingBar,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            bottom: Math.max(insets.bottom, 12),
-            display: isKeyboardVisible ? 'none' : 'flex',
-            shadowColor: isDark ? 'transparent' : '#000000',
-          },
-        ],
+        tabBarStyle: isKeyboardVisible
+          ? { display: 'none' }
+          : [
+              styles.floatingBar,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                bottom: Math.max(insets.bottom, 12),
+                shadowColor: isDark ? 'transparent' : '#000000',
+              },
+            ],
       }}
     >
       <Tabs.Screen

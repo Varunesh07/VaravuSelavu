@@ -24,7 +24,13 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
     return null;
   }
 
-  const chartWidth = Math.max(220, width - 110);
+  const itemCount = snapshot.data.length;
+  // Available width inside card (accounting for screen, bubble padding, card padding, and avatar)
+  const cardInnerWidth = Math.max(220, Math.min(width * 0.82, 330) - 36);
+  const plotAreaWidth = cardInnerWidth - 36;
+  const barWidth = Math.max(12, Math.min(18, Math.floor((plotAreaWidth / (itemCount + 1)) * 0.55)));
+  const spacing = Math.max(6, Math.min(14, Math.floor((plotAreaWidth - barWidth * itemCount) / (itemCount + 1))));
+
   const formattedAsOf = formatDisplayDate(snapshot.created_date || snapshot.to, {
     showTodayText: true,
   });
@@ -37,12 +43,17 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
           backgroundColor: colors.card,
           borderColor: colors.border,
           borderRadius: radius.card,
+          width: '100%',
+          overflow: 'hidden',
         },
       ]}
     >
       {/* Header with Title & "as of {date}" Badge */}
       <View style={styles.header}>
-        <Text style={[typography.body, { color: colors.text, fontWeight: '700', flex: 1 }]}>
+        <Text
+          style={[typography.body, { color: colors.text, fontWeight: '700', flex: 1, marginRight: 8 }]}
+          numberOfLines={1}
+        >
           {snapshot.title}
         </Text>
         <View style={[styles.badge, { backgroundColor: colors.cardAlt }]}>
@@ -63,8 +74,8 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
                 text: `${d.percent}%`,
               }))}
               donut
-              radius={55}
-              innerRadius={36}
+              radius={48}
+              innerRadius={30}
               innerCircleColor={colors.card}
             />
 
@@ -72,10 +83,10 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
               {snapshot.data.map((d, i) => (
                 <View key={i} style={styles.legendRow}>
                   <View style={[styles.dot, { backgroundColor: d.color || colors.primary }]} />
-                  <Text style={[typography.caption, { color: colors.text, flex: 1 }]} numberOfLines={1}>
+                  <Text style={[typography.caption, { color: colors.text, flex: 1, fontSize: 11 }]} numberOfLines={1}>
                     {d.label}
                   </Text>
-                  <Text style={[typography.caption, { color: colors.textMuted, fontWeight: '700' }]}>
+                  <Text style={[typography.caption, { color: colors.textMuted, fontWeight: '700', fontSize: 11 }]}>
                     {d.percent}%
                   </Text>
                 </View>
@@ -88,11 +99,12 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
           <BarChart
             data={snapshot.data.map((d) => ({
               value: d.value,
-              label: d.label,
+              label: d.label.length > 5 ? `${d.label.slice(0, 4)}.` : d.label,
               frontColor: d.color || colors.primary,
             }))}
-            barWidth={18}
-            spacing={12}
+            barWidth={barWidth}
+            spacing={spacing}
+            initialSpacing={8}
             roundedTop
             roundedBottom
             hideRules={false}
@@ -102,7 +114,8 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
             xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 9 }}
             yAxisColor="transparent"
             xAxisColor={colors.border}
-            width={chartWidth}
+            yAxisLabelWidth={30}
+            width={plotAreaWidth}
             height={130}
             noOfSections={3}
           />
@@ -112,7 +125,7 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
           <LineChart
             data={snapshot.data.map((d) => ({
               value: d.value,
-              label: d.label,
+              label: d.label.length > 5 ? `${d.label.slice(0, 4)}.` : d.label,
             }))}
             color={colors.primary}
             thickness={2.5}
@@ -123,11 +136,13 @@ export function ChatChartView({ snapshotJson }: ChatChartViewProps) {
             hideRules={false}
             rulesColor={colors.border}
             rulesType="dashed"
+            initialSpacing={8}
             yAxisTextStyle={{ color: colors.textMuted, fontSize: 8 }}
             xAxisLabelTextStyle={{ color: colors.textMuted, fontSize: 9 }}
             yAxisColor="transparent"
             xAxisColor={colors.border}
-            width={chartWidth}
+            yAxisLabelWidth={30}
+            width={plotAreaWidth}
             height={130}
             noOfSections={3}
             dataPointsColor={colors.primary}

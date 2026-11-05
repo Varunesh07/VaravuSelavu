@@ -10,9 +10,12 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Keyboard,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useTheme } from '../../src/theme';
@@ -27,6 +30,7 @@ import {
 } from '../../src/db/chats';
 import { sendChatMessage } from '../../src/services/ai';
 import { ChatChartView } from '../../src/components/ChatChartView';
+import { MarkdownText } from '../../src/components/MarkdownText';
 
 const SUGGESTIONS = [
   'How much did I spend this month?',
@@ -38,6 +42,7 @@ const SUGGESTIONS = [
 export default function ChatScreen() {
   const { colors, typography, spacing, radius } = useTheme();
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams<{ id: string }>();
   const chatId = parseInt(params.id, 10);
 
@@ -47,8 +52,40 @@ export default function ChatScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
   const [failedMessageIndex, setFailedMessageIndex] = useState<number | null>(null);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  const isNearBottomRef = useRef(true);
+
+  // Hide bottom tab bar while on Chat Screen
+  useEffect(() => {
+    navigation.getParent()?.setOptions({ tabBarStyle: { display: 'none' } });
+    return () => {
+      navigation.getParent()?.setOptions({ tabBarStyle: undefined });
+    };
+  }, [navigation]);
+
+  // Monitor keyboard visibility for edge-to-edge Android and iOS
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setIsKeyboardVisible(true);
+      if (isNearBottomRef.current) {
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+      }
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Monitor network status
   useEffect(() => {
@@ -99,6 +136,14 @@ export default function ChatScreen() {
     });
   }, [chatId]);
 
+  // Smart scrolling: track if user is already near bottom
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const paddingToBottom = 120;
+    const isClose = layoutMeasurement.height + contentOffset.y >= contentSize.height - paddingToBottom;
+    isNearBottomRef.current = isClose;
+  };
+
   // Send message handler
   const handleSend = async (textToSend?: string, existingUserMsgId?: number) => {
     const text = (textToSend || inputText).trim();
@@ -132,10 +177,14 @@ export default function ChatScreen() {
       }
     }
 
+    // Always scroll to bottom when user sends a message
+    isNearBottomRef.current = true;
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+
     setIsLoading(true);
 
     try {
-      // 2. Call AI engine with tool loop
+      // Call AI engine with tool loop
       const aiReply = await sendChatMessage(text, currentMessages);
 
       if (aiReply.canRetry) {
@@ -144,7 +193,7 @@ export default function ChatScreen() {
         return;
       }
 
-      // 3. Save assistant message when successful
+      // Save assistant message when successful
       const chartJsonStr = aiReply.chartSnapshot
         ? JSON.stringify(aiReply.chartSnapshot)
         : null;
@@ -166,6 +215,11 @@ export default function ChatScreen() {
       };
 
       setMessages([...currentMessages, assistantMsg]);
+
+      // Scroll to bottom only if user was already near bottom
+      if (isNearBottomRef.current) {
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
+      }
     } catch (err: any) {
       // Rule 125: On failure, keep user's message with Retry button, do not save error assistant message
       setFailedMessageIndex(currentMessages.length - 1);
@@ -197,6 +251,7 @@ export default function ChatScreen() {
   const renderMessageItem = ({ item, index }: { item: ChatMessage; index: number }) => {
     const isUser = item.role === 'user';
     const isFailed = isUser && failedMessageIndex === index;
+    const hasChart = !!item.chart_json;
 
     return (
       <View style={[styles.messageWrapper, isUser ? styles.userWrapper : styles.assistantWrapper]}>
@@ -213,18 +268,16 @@ export default function ChatScreen() {
               ? [styles.userBubble, { backgroundColor: colors.primary }]
               : [
                   styles.assistantBubble,
+                  hasChart && styles.assistantChartBubble,
                   { backgroundColor: colors.card, borderColor: colors.border },
                 ],
           ]}
         >
-          <Text
-            style={[
-              typography.body,
-              { color: isUser ? '#FFFFFF' : colors.text },
-            ]}
-          >
-            {item.content}
-          </Text>
+          {isUser ? (
+            <Text style={[typography.body, { color: '#FFFFFF' }]}>{item.content}</Text>
+          ) : (
+            <MarkdownText content={item.content} color={colors.text} />
+          )}
 
           {/* Render inline chart if snapshot exists */}
           {item.chart_json && <ChatChartView snapshotJson={item.chart_json} />}
@@ -247,33 +300,49 @@ export default function ChatScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={isKeyboardVisible ? ['top'] : ['top', 'bottom']}
+    >
       <KeyboardAvoidingView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {/* Header */}
+        {/* Header with strictly bounded title and fixed-size action buttons */}
         <View style={[styles.header, { paddingHorizontal: spacing.screenPadding, borderBottomColor: colors.border }]}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-          >
-            <Ionicons name="chevron-back" size={24} color={colors.text} />
-          </Pressable>
+          <View style={styles.headerButtonWrap}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
+            >
+              <Ionicons name="chevron-back" size={24} color={colors.text} />
+            </Pressable>
+          </View>
 
           <View style={styles.headerTitleWrap}>
-            <Text style={[typography.title, { color: colors.text, fontSize: 17 }]} numberOfLines={1}>
+            <Text
+              style={[typography.title, { color: colors.text, fontSize: 17, textAlign: 'center' }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               {chatTitle}
             </Text>
-            <Text style={[typography.caption, { color: colors.textMuted, fontSize: 11 }]}>
+            <Text
+              style={[typography.caption, { color: colors.textMuted, fontSize: 11, textAlign: 'center' }]}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
               Panda Money Helper
             </Text>
           </View>
 
-          <Pressable onPress={handleDeleteChat} hitSlop={12}>
-            <Ionicons name="trash-outline" size={20} color={colors.textMuted} />
-          </Pressable>
+          <View style={styles.headerButtonWrap}>
+            <Pressable onPress={handleDeleteChat} hitSlop={12}>
+              <Ionicons name="trash-outline" size={20} color={colors.textMuted} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Offline Banner */}
@@ -293,7 +362,8 @@ export default function ChatScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderMessageItem}
           contentContainerStyle={[styles.messagesContent, { paddingHorizontal: spacing.screenPadding }]}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           ListHeaderComponent={
             messages.length <= 1 ? (
               <View style={styles.suggestionsContainer}>
@@ -334,7 +404,7 @@ export default function ChatScreen() {
           }
         />
 
-        {/* Bottom Input Field */}
+        {/* Bottom Input Field with distinct states for disabled, active, and waiting */}
         <View style={[styles.inputBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
           <TextInput
             value={inputText}
@@ -351,18 +421,24 @@ export default function ChatScreen() {
           <Pressable
             onPress={() => handleSend()}
             disabled={!inputText.trim() || isLoading}
-            style={[
+            style={({ pressed }) => [
               styles.sendButton,
-              {
-                backgroundColor: inputText.trim() && !isLoading ? colors.primary : colors.cardAlt,
-              },
+              isLoading
+                ? { backgroundColor: `${colors.primary}25` }
+                : inputText.trim()
+                ? { backgroundColor: colors.primary, opacity: pressed ? 0.8 : 1 }
+                : { backgroundColor: colors.cardAlt, opacity: 0.5 },
             ]}
           >
-            <Ionicons
-              name="arrow-up"
-              size={20}
-              color={inputText.trim() && !isLoading ? '#FFFFFF' : colors.textMuted}
-            />
+            {isLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons
+                name="arrow-up"
+                size={20}
+                color={inputText.trim() ? '#FFFFFF' : colors.textMuted}
+              />
+            )}
           </Pressable>
         </View>
       </KeyboardAvoidingView>
@@ -381,9 +457,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  headerButtonWrap: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
   headerTitleWrap: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 8,
   },
   offlineBanner: {
@@ -424,6 +509,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 18,
+  },
+  assistantChartBubble: {
+    maxWidth: '92%',
+    width: '92%',
   },
   userBubble: {
     borderBottomRightRadius: 4,
