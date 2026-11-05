@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
-import { FlashList } from '@shopify/flash-list';
+import { FlashList, FlashListRef } from '@shopify/flash-list';
 
 import { useTheme } from '../../src/theme';
 import { useDataStore } from '../../src/store/dataStore';
@@ -65,6 +65,14 @@ export default function HistoryScreen() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
+  // Reference to Calendar day's FlashList to control scroll position
+  const dayListRef = useRef<FlashListRef<TransactionWithCategory>>(null);
+
+  // Scroll day list to top whenever selected date changes
+  useEffect(() => {
+    dayListRef.current?.scrollToOffset({ offset: 0, animated: false });
+  }, [selectedDate]);
+
   // Load Categories once or when dataVersion changes
   useEffect(() => {
     getCategories({ includeHidden: true })
@@ -108,6 +116,9 @@ export default function HistoryScreen() {
         if (!isMounted) return;
         setDayTransactions(txs);
         setDayTotals(totals);
+        requestAnimationFrame(() => {
+          dayListRef.current?.scrollToOffset({ offset: 0, animated: false });
+        });
       })
       .catch((err) => console.error('Failed to load day data:', err));
 
@@ -363,7 +374,10 @@ export default function HistoryScreen() {
               current={`${selectedMonth}-01`}
               markingType="multi-dot"
               markedDates={calendarMarkedDates}
-              onDayPress={(day: any) => setSelectedDate(day.dateString)}
+              onDayPress={(day: any) => {
+                setSelectedDate(day.dateString);
+                dayListRef.current?.scrollToOffset({ offset: 0, animated: false });
+              }}
               onMonthChange={(month: any) => setSelectedMonth(month.dateString.slice(0, 7))}
               hideArrows={true}
               theme={{
@@ -416,6 +430,7 @@ export default function HistoryScreen() {
 
           {/* Selected Day Transactions List */}
           <FlashList
+            ref={dayListRef}
             data={dayTransactions}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => renderTransactionRow(item)}
