@@ -39,38 +39,40 @@ if (!content.includes('System.getenv("VERSION_CODE")')) {
   );
 }
 
-// 3. Add release signing configuration if not already added
-if (!content.includes('signingConfigs {') || !content.includes('release {')) {
-  const signingConfigBlock = `    signingConfigs {
-        debug {
-            storeFile file('debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
-        }
-        release {
+// 3. Add release signing configuration to signingConfigs
+const releaseSigningBlock = `        release {
             if (System.getenv("KEYSTORE_PATH") && file(System.getenv("KEYSTORE_PATH")).exists()) {
                 storeFile file(System.getenv("KEYSTORE_PATH"))
                 storePassword System.getenv("KEYSTORE_PASSWORD")
                 keyAlias System.getenv("KEY_ALIAS")
                 keyPassword System.getenv("KEY_PASSWORD")
+            } else {
+                storeFile file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
             }
-        }
-    }`;
+        }`;
 
-  if (content.includes('buildTypes {')) {
-    content = content.replace('buildTypes {', `${signingConfigBlock}\n    buildTypes {`);
+if (!content.includes('storeFile file(System.getenv("KEYSTORE_PATH"))')) {
+  if (content.includes('signingConfigs {')) {
+    content = content.replace('signingConfigs {', `signingConfigs {\n${releaseSigningBlock}`);
+  } else if (content.includes('buildTypes {')) {
+    content = content.replace('buildTypes {', `    signingConfigs {\n${releaseSigningBlock}\n    }\n    buildTypes {`);
   }
 }
 
-// 4. Ensure release buildType points to signingConfigs.release if keystore is present, otherwise debug
-content = content.replace(
-  /release\s*\{[\s\S]*?signingConfig\s+signingConfigs\.debug/,
-  (match) => match.replace(
-    'signingConfig signingConfigs.debug',
-    'signingConfig (System.getenv("KEYSTORE_PATH") && file(System.getenv("KEYSTORE_PATH")).exists() ? signingConfigs.release : signingConfigs.debug)'
-  )
-);
+// 4. Ensure release buildType points to signingConfigs.release
+const buildTypesIdx = content.indexOf('buildTypes {');
+if (buildTypesIdx !== -1) {
+  const beforeBuildTypes = content.substring(0, buildTypesIdx);
+  let afterBuildTypes = content.substring(buildTypesIdx);
+  afterBuildTypes = afterBuildTypes.replace(
+    /release\s*\{[\s\S]*?signingConfig\s+signingConfigs\.debug/,
+    (match) => match.replace('signingConfig signingConfigs.debug', 'signingConfig signingConfigs.release')
+  );
+  content = beforeBuildTypes + afterBuildTypes;
+}
 
 fs.writeFileSync(buildGradlePath, content, 'utf8');
 console.log('Successfully applied signing & version code configuration to android/app/build.gradle');
