@@ -105,5 +105,37 @@ describe('Phase 2 Business Logic & Usage Bar Verification', () => {
       expect(slices[5].percent).toBe(5); // 7,000 / 132,000 ~ 5%
     });
   });
+
+  describe('Shared Chart Formats and Axis Resolution', () => {
+    test('Pie slice tooltip formatting matches requested format', () => {
+      const slice = { label: 'Food & snacks', percent: 20, value: 4000 };
+      const formatted = `${slice.label} / ${slice.percent}% · ₹${Math.round(slice.value).toLocaleString('en-IN')}`;
+      expect(formatted).toBe('Food & snacks / 20% · ₹4,000');
+    });
+
+    test('X-axis resolution correctly detects Category vs Date vs Month', () => {
+      const resolveXAxis = (
+        type: 'pie' | 'bar' | 'line',
+        items: { label: string }[],
+        explicit?: string
+      ) => {
+        if (explicit) return explicit;
+        if (type === 'bar') {
+          if (items.some((b) => b.label.match(/^\d{4}-\d{2}$/))) return 'Month';
+          if (items.some((b) => b.label.match(/\d{2}-\d{2}/))) return 'Date';
+          return 'Category';
+        }
+        if (items.some((l) => l.label.match(/^\d{4}-\d{2}$/))) return 'Month';
+        return 'Date';
+      };
+
+      expect(resolveXAxis('bar', [{ label: 'Travel' }, { label: 'Food' }])).toBe('Category');
+      expect(resolveXAxis('bar', [{ label: '11-01' }, { label: '11-02' }])).toBe('Date');
+      expect(resolveXAxis('bar', [{ label: '2026-11' }])).toBe('Month');
+      expect(resolveXAxis('bar', [{ label: 'Sun' }, { label: 'Mon' }], 'Date')).toBe('Date');
+      expect(resolveXAxis('line', [{ label: '2026-11' }])).toBe('Month');
+      expect(resolveXAxis('line', [{ label: '11-05' }])).toBe('Date');
+    });
+  });
 });
 

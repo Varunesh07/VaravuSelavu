@@ -1,4 +1,4 @@
-import { toPaise, formatINR, paiseToRupees } from '../utils/money';
+import { toPaise, formatINR, paiseToRupees, formatIndianCurrencyAbbreviated } from '../utils/money';
 
 describe('Money Utilities (paise & formatINR)', () => {
   describe('toPaise', () => {
@@ -60,6 +60,30 @@ describe('Money Utilities (paise & formatINR)', () => {
     it('converts correctly', () => {
       expect(paiseToRupees(12345)).toBe(123.45);
       expect(paiseToRupees(50000)).toBe(500);
+    });
+  });
+
+  describe('formatIndianCurrencyAbbreviated', () => {
+    it('formats 0 and small rupee amounts', () => {
+      expect(formatIndianCurrencyAbbreviated(0)).toBe('₹0');
+      expect(formatIndianCurrencyAbbreviated(500)).toBe('₹500');
+      expect(formatIndianCurrencyAbbreviated(999)).toBe('₹999');
+    });
+
+    it('formats thousands in k format', () => {
+      expect(formatIndianCurrencyAbbreviated(1000)).toBe('₹1k');
+      expect(formatIndianCurrencyAbbreviated(1200)).toBe('₹1.2k');
+      expect(formatIndianCurrencyAbbreviated(4000)).toBe('₹4k');
+      expect(formatIndianCurrencyAbbreviated(20000)).toBe('₹20k');
+    });
+
+    it('formats lakhs in L format', () => {
+      expect(formatIndianCurrencyAbbreviated(100000)).toBe('₹1L');
+      expect(formatIndianCurrencyAbbreviated(150000)).toBe('₹1.5L');
+    });
+
+    it('formats crores in Cr format', () => {
+      expect(formatIndianCurrencyAbbreviated(10000000)).toBe('₹1Cr');
     });
   });
 });

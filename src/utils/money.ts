@@ -93,3 +93,30 @@ export function formatINR(
   return `${prefix}${formattedAmount}`;
 }
 
+/**
+ * Formats a rupee number into compact Indian notation (e.g. ₹0, ₹500, ₹1.2k, ₹10k, ₹1.5L, ₹1Cr).
+ * Used for chart Y-axis ticks and compact labels.
+ */
+export function formatIndianCurrencyAbbreviated(rupees: number): string {
+  if (!rupees || isNaN(rupees) || rupees === 0) return '₹0';
+  const abs = Math.abs(rupees);
+  const sign = rupees < 0 ? '−' : '';
+
+  if (abs >= 10000000) {
+    const cr = abs / 10000000;
+    const formatted = cr >= 10 || cr % 1 === 0 ? cr.toFixed(0) : cr.toFixed(1);
+    return `${sign}₹${formatted}Cr`;
+  }
+  if (abs >= 100000) {
+    const l = abs / 100000;
+    const formatted = l >= 10 || l % 1 === 0 ? l.toFixed(0) : l.toFixed(1);
+    return `${sign}₹${formatted}L`;
+  }
+  if (abs >= 1000) {
+    const k = abs / 1000;
+    const formatted = k >= 10 || k % 1 === 0 ? k.toFixed(0) : k.toFixed(1);
+    return `${sign}₹${formatted}k`;
+  }
+  return `${sign}₹${Math.round(abs)}`;
+}
+
