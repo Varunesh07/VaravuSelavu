@@ -15,12 +15,12 @@ export const GROQ_TOOLS = [
         type: 'object',
         properties: {
           from: {
-            type: 'string',
-            description: 'Start date in YYYY-MM-DD format (inclusive). Optional, defaults to start of current month.',
+            type: ['string', 'null'],
+            description: 'Start date in YYYY-MM-DD format (inclusive). Optional or null, defaults to start of current month.',
           },
           to: {
-            type: 'string',
-            description: 'End date in YYYY-MM-DD format (inclusive). Optional, defaults to end of current month.',
+            type: ['string', 'null'],
+            description: 'End date in YYYY-MM-DD format (inclusive). Optional or null, defaults to end of current month.',
           },
         },
         required: [],
@@ -37,16 +37,16 @@ export const GROQ_TOOLS = [
         type: 'object',
         properties: {
           from: {
-            type: 'string',
-            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'Start date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           to: {
-            type: 'string',
-            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'End date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           type: {
-            type: 'string',
-            enum: ['expense', 'income'],
+            type: ['string', 'null'],
+            enum: ['expense', 'income', null],
             description: 'Whether to break down expenses or income. Default is expense.',
           },
         },
@@ -64,20 +64,20 @@ export const GROQ_TOOLS = [
         type: 'object',
         properties: {
           from: {
-            type: 'string',
-            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'Start date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           to: {
-            type: 'string',
-            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'End date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           group_by: {
-            type: 'string',
-            enum: ['day', 'week', 'month'],
+            type: ['string', 'null'],
+            enum: ['day', 'week', 'month', null],
             description: 'How to group data points: day, week, or month.',
           },
           category: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'Optional category name to filter the trend (e.g. "Food & snacks").',
           },
         },
@@ -95,28 +95,28 @@ export const GROQ_TOOLS = [
         type: 'object',
         properties: {
           from: {
-            type: 'string',
-            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'Start date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           to: {
-            type: 'string',
-            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'End date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           category: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'Optional category name filter.',
           },
           search: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'Optional search keyword to match in notes or category names.',
           },
           sort: {
-            type: 'string',
-            enum: ['date_desc', 'amount_desc'],
+            type: ['string', 'null'],
+            enum: ['date_desc', 'amount_desc', null],
             description: 'Sort order: newest first (date_desc) or largest amount first (amount_desc).',
           },
           limit: {
-            type: 'integer',
+            type: ['integer', 'null'],
             description: 'Maximum transactions to return (1-15, default 10).',
           },
         },
@@ -134,19 +134,19 @@ export const GROQ_TOOLS = [
         type: 'object',
         properties: {
           from_a: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'Start date of Period A (e.g. last month).',
           },
           to_a: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'End date of Period A.',
           },
           from_b: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'Start date of Period B (e.g. this month).',
           },
           to_b: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'End date of Period B.',
           },
         },
@@ -173,25 +173,25 @@ export const GROQ_TOOLS = [
             description: 'Short descriptive title for the chart (e.g. "December Expenses").',
           },
           metric: {
-            type: 'string',
-            enum: ['expense', 'income'],
+            type: ['string', 'null'],
+            enum: ['expense', 'income', null],
             description: 'Whether to plot expense or income. Default is expense.',
           },
           group_by: {
-            type: 'string',
-            enum: ['category', 'day', 'week', 'month'],
+            type: ['string', 'null'],
+            enum: ['category', 'day', 'week', 'month', null],
             description: 'Grouping dimension: category (for pie/bar), day/week/month (for line/bar).',
           },
           from: {
-            type: 'string',
-            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'Start date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           to: {
-            type: 'string',
-            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
+            type: ['string', 'null'],
+            description: 'End date in YYYY-MM-DD format. Optional or null, defaults to current month.',
           },
           category: {
-            type: 'string',
+            type: ['string', 'null'],
             description: 'Optional category name filter.',
           },
         },
@@ -207,6 +207,7 @@ export const GROQ_TOOLS = [
 const DateStringSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD')
+  .nullable()
   .optional();
 
 export const SpendingSummaryArgsSchema = z.object({
@@ -217,23 +218,23 @@ export const SpendingSummaryArgsSchema = z.object({
 export const CategoryBreakdownArgsSchema = z.object({
   from: DateStringSchema,
   to: DateStringSchema,
-  type: z.enum(['expense', 'income']).default('expense'),
+  type: z.enum(['expense', 'income']).nullable().optional().default('expense'),
 });
 
 export const TrendArgsSchema = z.object({
   from: DateStringSchema,
   to: DateStringSchema,
-  group_by: z.enum(['day', 'week', 'month']).default('day'),
-  category: z.string().optional(),
+  group_by: z.enum(['day', 'week', 'month']).nullable().optional().default('day'),
+  category: z.string().nullable().optional(),
 });
 
 export const TransactionsArgsSchema = z.object({
   from: DateStringSchema,
   to: DateStringSchema,
-  category: z.string().optional(),
-  search: z.string().optional(),
-  sort: z.enum(['date_desc', 'amount_desc']).default('date_desc'),
-  limit: z.coerce.number().min(1).max(15).default(10),
+  category: z.string().nullable().optional(),
+  search: z.string().nullable().optional(),
+  sort: z.enum(['date_desc', 'amount_desc']).nullable().optional().default('date_desc'),
+  limit: z.coerce.number().min(1).max(15).nullable().optional().default(10),
 });
 
 export const ComparePeriodsArgsSchema = z.object({
@@ -246,11 +247,11 @@ export const ComparePeriodsArgsSchema = z.object({
 export const ShowChartArgsSchema = z.object({
   type: z.enum(['pie', 'bar', 'line']),
   title: z.string().min(1).max(60),
-  metric: z.enum(['expense', 'income']).default('expense'),
-  group_by: z.enum(['category', 'day', 'week', 'month']).default('category'),
+  metric: z.enum(['expense', 'income']).nullable().optional().default('expense'),
+  group_by: z.enum(['category', 'day', 'week', 'month']).nullable().optional().default('category'),
   from: DateStringSchema,
   to: DateStringSchema,
-  category: z.string().optional(),
+  category: z.string().nullable().optional(),
 });
 
 /**

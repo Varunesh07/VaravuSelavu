@@ -171,7 +171,7 @@ export async function sendChatMessage(
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        console.error('Groq API Error:', res.status, JSON.stringify(errorData));
+        console.warn('Groq API Error:', res.status, JSON.stringify(errorData));
 
         // If 404 model not found, reset cache
         if (res.status === 404) {
