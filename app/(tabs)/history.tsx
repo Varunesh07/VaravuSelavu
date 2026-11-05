@@ -24,6 +24,7 @@ import {
 } from '../../src/db/transactions';
 import { getCategories, Category } from '../../src/db/categories';
 import { formatINR } from '../../src/utils/money';
+import { Panda } from '../../src/components/panda/Panda';
 import {
   getTodayDateString,
   getCurrentYearMonth,
@@ -440,8 +441,8 @@ export default function HistoryScreen() {
             }}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Ionicons name="receipt-outline" size={44} color={colors.textMuted} style={{ opacity: 0.4 }} />
-                <Text style={[typography.body, { color: colors.textMuted, marginTop: 8 }]}>
+                <Panda reaction="sleeping" size={72} animated={false} />
+                <Text style={[typography.body, { color: colors.textMuted, marginTop: 10 }]}>
                   No transactions on this day
                 </Text>
               </View>
@@ -549,8 +550,8 @@ export default function HistoryScreen() {
               }}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Ionicons name="receipt-outline" size={44} color={colors.textMuted} style={{ opacity: 0.4 }} />
-                  <Text style={[typography.body, { color: colors.textMuted, marginTop: 8 }]}>
+                  <Panda reaction="sleeping" size={72} animated={false} />
+                  <Text style={[typography.body, { color: colors.textMuted, marginTop: 10 }]}>
                     No transactions found for this month
                   </Text>
                 </View>

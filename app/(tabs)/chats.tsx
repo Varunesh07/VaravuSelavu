@@ -11,9 +11,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../src/theme';
 import { Chat, getChats, createChat, deleteChat } from '../../src/db/chats';
 import { formatDisplayDate } from '../../src/utils/dates';
+import { Panda } from '../../src/components/panda/Panda';
 
 export default function ChatsScreen() {
   const { colors, typography, spacing, radius } = useTheme();
@@ -72,6 +74,7 @@ export default function ChatsScreen() {
           onPress: async () => {
             try {
               await deleteChat(chatId);
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setChats((prev) => prev.filter((c) => c.id !== chatId));
             } catch (err: any) {
               Alert.alert('Error', err.message || 'Failed to delete chat.');
@@ -99,8 +102,8 @@ export default function ChatsScreen() {
           },
         ]}
       >
-        <View style={[styles.avatar, { backgroundColor: `${colors.primary}18` }]}>
-          <Text style={styles.pandaText}>🐼</Text>
+        <View style={styles.avatar}>
+          <Panda reaction="happy" size={36} animated={false} />
         </View>
 
         <View style={styles.chatInfo}>
@@ -177,9 +180,7 @@ export default function ChatsScreen() {
           ]}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <View style={[styles.bigPandaCircle, { backgroundColor: `${colors.primary}12` }]}>
-                <Text style={styles.bigPandaEmoji}>🐼</Text>
-              </View>
+              <Panda reaction="sleeping" size={80} animated={false} />
               <Text style={[typography.title, { color: colors.text, marginTop: 14 }]}>
                 Ask Panda Anything
               </Text>

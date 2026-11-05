@@ -126,8 +126,8 @@ export default function HomeScreen() {
 
         {/* 2. Panda Mascot Greeting Banner */}
         <PandaBanner
-          netPaise={totals.netPaise}
           totalIncomePaise={totals.totalIncomePaise}
+          totalExpensePaise={totals.totalExpensePaise}
         />
 
         {/* 3. Top 4 Category Quick Tiles */}

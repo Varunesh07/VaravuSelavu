@@ -2,32 +2,34 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme';
+import { Panda } from './panda/Panda';
+import { getHomePandaMood } from '../utils/pandaMood';
 
 interface PandaBannerProps {
-  netPaise: number;
   totalIncomePaise: number;
+  totalExpensePaise: number;
 }
 
-export function PandaBanner({ netPaise, totalIncomePaise }: PandaBannerProps) {
+export function PandaBanner({ totalIncomePaise, totalExpensePaise }: PandaBannerProps) {
   const { colors, typography, radius } = useTheme();
 
-  // Mood determination
-  let message = 'Vanakkam! Track every rupee, save for what matters.';
-  let moodIcon: keyof typeof Ionicons.glyphMap = 'happy-outline';
-  let moodColor = colors.primary;
+  const { reaction, message } = getHomePandaMood(totalIncomePaise, totalExpensePaise);
 
-  if (totalIncomePaise === 0 && netPaise < 0) {
-    message = 'Recorded expenses without income yet! Add pocket money or earnings.';
-    moodIcon = 'help-circle-outline';
+  let moodColor = colors.primary;
+  let moodIcon: keyof typeof Ionicons.glyphMap = 'happy-outline';
+
+  if (reaction === 'sleeping') {
     moodColor = colors.accent;
-  } else if (netPaise < 0) {
-    message = 'Spending exceeded income! Time to go easy on canteen snacks.';
-    moodIcon = 'alert-circle-outline';
+    moodIcon = 'moon-outline';
+  } else if (reaction === 'crying') {
     moodColor = colors.expense;
-  } else if (netPaise > 0) {
-    message = 'Great job staying in the green! Keep it up.';
-    moodIcon = 'checkmark-circle-outline';
+    moodIcon = 'alert-circle-outline';
+  } else if (reaction === 'pleading') {
+    moodColor = '#F59E0B'; // Amber caution
+    moodIcon = 'warning-outline';
+  } else {
     moodColor = colors.income;
+    moodIcon = 'sparkles-outline';
   }
 
   return (
@@ -41,8 +43,8 @@ export function PandaBanner({ netPaise, totalIncomePaise }: PandaBannerProps) {
         },
       ]}
     >
-      <View style={[styles.avatarCircle, { backgroundColor: `${moodColor}15` }]}>
-        <Text style={styles.pandaEmoji}>🐼</Text>
+      <View style={styles.pandaWrapper}>
+        <Panda reaction={reaction} size={64} animated={true} />
       </View>
       <View style={styles.textWrap}>
         <View style={styles.titleRow}>
@@ -51,7 +53,7 @@ export function PandaBanner({ netPaise, totalIncomePaise }: PandaBannerProps) {
           </Text>
           <Ionicons name={moodIcon} size={14} color={moodColor} style={{ marginLeft: 4 }} />
         </View>
-        <Text style={[typography.caption, { color: colors.text, marginTop: 2 }]}>
+        <Text style={[typography.caption, { color: colors.text, marginTop: 3 }]}>
           {message}
         </Text>
       </View>
@@ -63,20 +65,14 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
+    padding: 12,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 16,
   },
-  avatarCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  pandaWrapper: {
+    marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-  },
-  pandaEmoji: {
-    fontSize: 24,
   },
   textWrap: {
     flex: 1,
@@ -86,4 +82,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-

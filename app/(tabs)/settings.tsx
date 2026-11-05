@@ -618,9 +618,10 @@ export default function SettingsScreen() {
         {/* Footer / Version info with hidden developer long-press */}
         <View style={styles.footer}>
           <Pressable
-            onLongPress={handleDevLongPress}
+            onLongPress={__DEV__ ? handleDevLongPress : undefined}
             delayLongPress={1000}
             hitSlop={16}
+            disabled={!__DEV__}
           >
             <Text style={[typography.caption, { color: colors.textMuted, textAlign: 'center' }]}>
               {APP_NAME} v{APP_VERSION}

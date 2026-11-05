@@ -31,6 +31,7 @@ import {
 import { sendChatMessage } from '../../src/services/ai';
 import { ChatChartView } from '../../src/components/ChatChartView';
 import { MarkdownText } from '../../src/components/MarkdownText';
+import { Panda } from '../../src/components/panda/Panda';
 
 const SUGGESTIONS = [
   'How much did I spend this month?',
@@ -256,8 +257,8 @@ export default function ChatScreen() {
     return (
       <View style={[styles.messageWrapper, isUser ? styles.userWrapper : styles.assistantWrapper]}>
         {!isUser && (
-          <View style={[styles.avatarCircle, { backgroundColor: `${colors.primary}18` }]}>
-            <Text style={styles.pandaAvatar}>🐼</Text>
+          <View style={styles.avatarCircle}>
+            <Panda reaction="happy" size={32} animated={false} />
           </View>
         )}
 
@@ -390,8 +391,8 @@ export default function ChatScreen() {
           ListFooterComponent={
             isLoading ? (
               <View style={styles.thinkingWrapper}>
-                <View style={[styles.avatarCircle, { backgroundColor: `${colors.primary}18` }]}>
-                  <Text style={styles.pandaAvatar}>🐼</Text>
+                <View style={styles.thinkingAvatar}>
+                  <Panda reaction="thinking" size={64} animated={true} maxDuration={20000} />
                 </View>
                 <View style={[styles.thinkingBubble, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
@@ -548,6 +549,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
+  },
+  thinkingAvatar: {
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   thinkingBubble: {
     flexDirection: 'row',

@@ -32,6 +32,9 @@ import {
   formatDisplayDate,
   isDateInFuture,
 } from '../src/utils/dates';
+import { Panda, PandaReaction } from '../src/components/panda/Panda';
+import { getAllTimeTotals } from '../src/db/stats';
+import { getPostSaveReaction } from '../src/utils/pandaMood';
 
 export default function AddTransactionScreen() {
   const { colors, typography, spacing, radius } = useTheme();
@@ -63,6 +66,7 @@ export default function AddTransactionScreen() {
   // Submitting state with double-tap guard
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [postSaveReaction, setPostSaveReaction] = useState<PandaReaction | null>(null);
 
   // Keyboard listener to keep focused note field visible
   useEffect(() => {
@@ -228,9 +232,18 @@ export default function AddTransactionScreen() {
         });
       }
 
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      bumpDataVersion();
-      router.back();
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      // Determine Panda reaction
+      const totals = await getAllTimeTotals();
+      const reaction = getPostSaveReaction(type, totals.totalIncomePaise, totals.totalExpensePaise);
+      setPostSaveReaction(reaction);
+
+      // Brief 2-second celebration/shocked reaction then navigate back
+      setTimeout(() => {
+        bumpDataVersion();
+        router.back();
+      }, 2000);
     } catch (err: any) {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -253,7 +266,7 @@ export default function AddTransactionScreen() {
           onPress: async () => {
             try {
               await deleteTransaction(editId);
-              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               bumpDataVersion();
               router.back();
             } catch (err: any) {
@@ -311,7 +324,7 @@ export default function AddTransactionScreen() {
             styles.scrollContent,
             {
               paddingHorizontal: spacing.screenPadding,
-              paddingBottom: isKeyboardVisible ? 36 : 16,
+              paddingBottom: isKeyboardVisible ? 140 : 24,
             },
           ]}
           keyboardShouldPersistTaps="handled"
@@ -563,7 +576,7 @@ export default function AddTransactionScreen() {
                 isNoteFocusedRef.current = true;
                 setTimeout(() => {
                   scrollViewRef.current?.scrollToEnd({ animated: true });
-                }, 100);
+                }, 200);
               }}
               onBlur={() => {
                 isNoteFocusedRef.current = false;
@@ -618,6 +631,31 @@ export default function AddTransactionScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* 2-Second Post-Save Panda Reaction Overlay */}
+      {postSaveReaction && (
+        <View style={styles.reactionOverlay}>
+          <View
+            style={[
+              styles.reactionCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                borderRadius: radius.card,
+              },
+            ]}
+          >
+            <Panda reaction={postSaveReaction} size={88} animated={true} />
+            <Text style={[typography.title, { color: colors.text, marginTop: 14, textAlign: 'center' }]}>
+              {postSaveReaction === 'celebrating'
+                ? 'Income Saved! 🎉'
+                : postSaveReaction === 'shocked'
+                ? 'Watch out, Overspent! 😮'
+                : 'Saved! ✨'}
+            </Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -729,5 +767,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  reactionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  reactionCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 32,
+    borderWidth: StyleSheet.hairlineWidth,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
   },
 });

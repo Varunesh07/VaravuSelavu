@@ -12,6 +12,18 @@ import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../src/theme';
 import { useThemeStore } from '../src/store/themeStore';
 
+// Strip all financial data, tool results, and console logs in release builds
+if (!__DEV__) {
+  console.log = () => {};
+  console.info = () => {};
+  console.debug = () => {};
+  console.warn = () => {};
+  const originalError = console.error;
+  console.error = () => {
+    originalError('[Varavuselavu]');
+  };
+}
+
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* reloading the app might cause some race conditions */

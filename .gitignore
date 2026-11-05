@@ -48,3 +48,6 @@ keystore.b64
 
 # Documentation (local only)
 docs/
+
+# Archives
+*.zip
