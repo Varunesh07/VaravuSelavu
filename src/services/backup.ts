@@ -400,6 +400,62 @@ export async function executePreResetBackup(): Promise<{
 }
 
 /**
+ * Safely reads the text content of a file from any URI (SAF content://, file://, or cache).
+ * Handles Expo Go permission constraints by trying SAF, fetch(), FileSystem, and modern File API.
+ */
+async function readFileContentSafely(fileUri: string): Promise<string> {
+  // Strategy 1: Content URI via StorageAccessFramework
+  if (fileUri.startsWith('content://')) {
+    if (StorageAccessFramework?.readAsStringAsync) {
+      try {
+        const text = await StorageAccessFramework.readAsStringAsync(fileUri);
+        if (text) return text;
+      } catch (e) {
+        console.warn('StorageAccessFramework read failed:', e);
+      }
+    }
+    try {
+      const text = await (activeFs as any)?.readAsStringAsync?.(fileUri);
+      if (text) return text;
+    } catch (e) {
+      console.warn('activeFs content read failed:', e);
+    }
+  }
+
+  // Strategy 2: React Native fetch() - works for both file:// and content:// in React Native
+  try {
+    const res = await fetch(fileUri);
+    if (res.ok) {
+      const text = await res.text();
+      if (text) return text;
+    }
+  } catch {
+    // continue to next method
+  }
+
+  // Strategy 3: Standard FileSystem readAsStringAsync
+  try {
+    const text = await (activeFs as any)?.readAsStringAsync?.(fileUri);
+    if (text) return text;
+  } catch {
+    // continue to next method
+  }
+
+  // Strategy 4: Modern expo-file-system File API
+  if (typeof (FileSystemNew as any)?.File === 'function') {
+    try {
+      const f = new (FileSystemNew as any).File(fileUri);
+      const text = await f.text();
+      if (text) return text;
+    } catch {
+      // continue
+    }
+  }
+
+  throw new Error('Could not read backup file content with any available file reader.');
+}
+
+/**
  * Restores the entire database from a picked JSON file.
  * - Cancels pending backups
  * - Validates schema with Zod
@@ -415,23 +471,8 @@ export async function restoreFromFile(fileUri: string): Promise<{
   cancelPendingBackups();
 
   try {
-    // 1. Read JSON file with dual SAF/standard fallback
-    let content = '';
-    try {
-      if (fileUri.startsWith('content://') && StorageAccessFramework) {
-        content = await StorageAccessFramework.readAsStringAsync(fileUri);
-      } else {
-        content = await (activeFs as any).readAsStringAsync(fileUri);
-      }
-    } catch {
-      try {
-        content = await (activeFs as any).readAsStringAsync(fileUri);
-      } catch {
-        if (StorageAccessFramework) {
-          content = await StorageAccessFramework.readAsStringAsync(fileUri);
-        }
-      }
-    }
+    // 1. Read JSON file with multi-layered safe reader
+    const content = await readFileContentSafely(fileUri);
 
     if (!content) {
       return { ok: false, error: 'Backup file is empty or cannot be read.' };
@@ -554,7 +595,7 @@ export async function pickAndRestoreBackup(): Promise<{
   try {
     const res = await DocumentPicker.getDocumentAsync({
       type: ['application/json', 'text/json', '*/*'],
-      copyToCacheDirectory: true,
+      copyToCacheDirectory: false,
     });
 
     if (res.canceled || !res.assets || res.assets.length === 0) {
