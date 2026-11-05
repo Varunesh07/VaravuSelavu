@@ -16,6 +16,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import NetInfo from '@react-native-community/netinfo';
 import { useTheme } from '../../src/theme';
+import { getDatabase } from '../../src/db';
 import {
   ChatMessage,
   getChatById,
@@ -65,51 +66,85 @@ export default function ChatScreen() {
       if (chat) setChatTitle(chat.title);
     });
 
-    getMessages(chatId).then((msgs) => {
-      setMessages(msgs);
+    getMessages(chatId).then(async (msgs) => {
+      // Filter out and clean up any previously saved failed assistant messages (Rule 125)
+      const validMsgs = msgs.filter(
+        (m) =>
+          !(
+            m.role === 'assistant' &&
+            (m.content.includes("I'm a bit slow right now") ||
+              m.content.includes('trouble processing') ||
+              m.content.includes('connection issue'))
+          )
+      );
+
+      if (validMsgs.length < msgs.length) {
+        try {
+          const db = await getDatabase();
+          await db.runAsync(
+            "DELETE FROM messages WHERE chat_id = ? AND role = 'assistant' AND (content LIKE '%slow right now%' OR content LIKE '%trouble processing%' OR content LIKE '%connection issue%')",
+            [chatId]
+          );
+        } catch {
+          // ignore cleanup error
+        }
+      }
+
+      setMessages(validMsgs);
+
+      // Rule 107: If last message is user (unanswered), show Retry on it
+      if (validMsgs.length > 0 && validMsgs[validMsgs.length - 1].role === 'user') {
+        setFailedMessageIndex(validMsgs.length - 1);
+      }
     });
   }, [chatId]);
 
   // Send message handler
-  const handleSend = async (textToSend?: string) => {
+  const handleSend = async (textToSend?: string, existingUserMsgId?: number) => {
     const text = (textToSend || inputText).trim();
     if (!text || isLoading || isNaN(chatId)) return;
 
     setInputText('');
     setFailedMessageIndex(null);
 
-    // 1. Insert user message to DB
-    const userMsgId = await insertMessage(chatId, 'user', text);
-    const userMsg: ChatMessage = {
-      id: userMsgId,
-      chat_id: chatId,
-      role: 'user',
-      content: text,
-      chart_json: null,
-      created_at: Date.now(),
-    };
+    let currentMessages = messages;
 
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+    // Only insert new user message if not retrying an existing message
+    if (!existingUserMsgId) {
+      const userMsgId = await insertMessage(chatId, 'user', text);
+      const userMsg: ChatMessage = {
+        id: userMsgId,
+        chat_id: chatId,
+        role: 'user',
+        content: text,
+        chart_json: null,
+        created_at: Date.now(),
+      };
 
-    // Update title if it was "New chat"
-    if (chatTitle === 'New chat' || messages.length === 0) {
-      const newTitle = text.slice(0, 40);
-      setChatTitle(newTitle);
-      await updateChatTitle(chatId, newTitle);
+      currentMessages = [...messages, userMsg];
+      setMessages(currentMessages);
+
+      // Update title if it was "New chat"
+      if (chatTitle === 'New chat' || messages.length === 0) {
+        const newTitle = text.slice(0, 40);
+        setChatTitle(newTitle);
+        await updateChatTitle(chatId, newTitle);
+      }
     }
 
     setIsLoading(true);
 
     try {
       // 2. Call AI engine with tool loop
-      const aiReply = await sendChatMessage(text, messages);
+      const aiReply = await sendChatMessage(text, currentMessages);
 
       if (aiReply.canRetry) {
-        setFailedMessageIndex(newMessages.length - 1);
+        // Rule 125: Do not save failed attempts as assistant messages. Keep the user's message so Retry resends it.
+        setFailedMessageIndex(currentMessages.length - 1);
+        return;
       }
 
-      // 3. Save assistant message if not a blocking error
+      // 3. Save assistant message when successful
       const chartJsonStr = aiReply.chartSnapshot
         ? JSON.stringify(aiReply.chartSnapshot)
         : null;
@@ -130,26 +165,18 @@ export default function ChatScreen() {
         created_at: Date.now(),
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      setMessages([...currentMessages, assistantMsg]);
     } catch (err: any) {
-      setFailedMessageIndex(newMessages.length - 1);
-      const errMsg: ChatMessage = {
-        id: Date.now(),
-        chat_id: chatId,
-        role: 'assistant',
-        content: 'I had trouble processing that. Tap retry on your message to try again.',
-        chart_json: null,
-        created_at: Date.now(),
-      };
-      setMessages((prev) => [...prev, errMsg]);
+      // Rule 125: On failure, keep user's message with Retry button, do not save error assistant message
+      setFailedMessageIndex(currentMessages.length - 1);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Retry sending failed user message
+  // Retry sending failed user message without duplicating it in DB
   const handleRetry = (msg: ChatMessage) => {
-    handleSend(msg.content);
+    handleSend(msg.content, msg.id);
   };
 
   // Delete chat

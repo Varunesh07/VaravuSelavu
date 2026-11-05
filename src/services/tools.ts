@@ -10,20 +10,20 @@ export const GROQ_TOOLS = [
     function: {
       name: 'get_spending_summary',
       description:
-        'Get spending and income summary for a date range: total money in, total spent, net savings, transaction count, and top 3 expense categories. Dates must be YYYY-MM-DD.',
+        'Get spending and income summary for a date range: total money in, total spent, net savings, transaction count, and top 3 expense categories. Dates are optional YYYY-MM-DD.',
       parameters: {
         type: 'object',
         properties: {
           from: {
             type: 'string',
-            description: 'Start date in YYYY-MM-DD format (inclusive).',
+            description: 'Start date in YYYY-MM-DD format (inclusive). Optional, defaults to start of current month.',
           },
           to: {
             type: 'string',
-            description: 'End date in YYYY-MM-DD format (inclusive).',
+            description: 'End date in YYYY-MM-DD format (inclusive). Optional, defaults to end of current month.',
           },
         },
-        required: ['from', 'to'],
+        required: [],
       },
     },
   },
@@ -38,11 +38,11 @@ export const GROQ_TOOLS = [
         properties: {
           from: {
             type: 'string',
-            description: 'Start date in YYYY-MM-DD format.',
+            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           to: {
             type: 'string',
-            description: 'End date in YYYY-MM-DD format.',
+            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           type: {
             type: 'string',
@@ -50,7 +50,7 @@ export const GROQ_TOOLS = [
             description: 'Whether to break down expenses or income. Default is expense.',
           },
         },
-        required: ['from', 'to'],
+        required: [],
       },
     },
   },
@@ -65,23 +65,23 @@ export const GROQ_TOOLS = [
         properties: {
           from: {
             type: 'string',
-            description: 'Start date in YYYY-MM-DD format.',
+            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           to: {
             type: 'string',
-            description: 'End date in YYYY-MM-DD format.',
+            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           group_by: {
             type: 'string',
             enum: ['day', 'week', 'month'],
-            description: 'How to group the data points.',
+            description: 'How to group data points: day, week, or month.',
           },
           category: {
             type: 'string',
             description: 'Optional category name to filter the trend (e.g. "Food & snacks").',
           },
         },
-        required: ['from', 'to', 'group_by'],
+        required: [],
       },
     },
   },
@@ -96,11 +96,11 @@ export const GROQ_TOOLS = [
         properties: {
           from: {
             type: 'string',
-            description: 'Start date in YYYY-MM-DD format.',
+            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           to: {
             type: 'string',
-            description: 'End date in YYYY-MM-DD format.',
+            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           category: {
             type: 'string',
@@ -120,7 +120,7 @@ export const GROQ_TOOLS = [
             description: 'Maximum transactions to return (1-15, default 10).',
           },
         },
-        required: ['from', 'to'],
+        required: [],
       },
     },
   },
@@ -184,18 +184,18 @@ export const GROQ_TOOLS = [
           },
           from: {
             type: 'string',
-            description: 'Start date in YYYY-MM-DD format.',
+            description: 'Start date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           to: {
             type: 'string',
-            description: 'End date in YYYY-MM-DD format.',
+            description: 'End date in YYYY-MM-DD format. Optional, defaults to current month.',
           },
           category: {
             type: 'string',
             description: 'Optional category name filter.',
           },
         },
-        required: ['type', 'title', 'from', 'to'],
+        required: ['type', 'title'],
       },
     },
   },
@@ -293,3 +293,4 @@ export function normalizeDateRange(rawFrom?: string, rawTo?: string): {
 
   return { from, to, adjustedNote };
 }
+

@@ -3,7 +3,7 @@ import { GROQ_API_URL, GROQ_MODEL } from '../constants';
 import { getGroqApiKey } from './aiKey';
 import { buildSystemPrompt } from './prompt';
 import { GROQ_TOOLS } from './tools';
-import { executeToolCall, ChartSnapshot } from './toolExecutor';
+import { executeToolCall, executeSpendingSummary, ChartSnapshot } from './toolExecutor';
 import { ChatMessage } from '../db/chats';
 
 export interface AIResponse {
@@ -46,7 +46,14 @@ export async function sendChatMessage(
 
   // 3. Build initial conversation messages
   const systemPrompt = await buildSystemPrompt();
-  const recentHistory = history.slice(-6); // Last 6 messages
+  // Filter out any previous error messages
+  const cleanHistory = history.filter(
+    (m) =>
+      !m.content.includes("I'm a bit slow right now") &&
+      !m.content.includes('trouble processing') &&
+      !m.content.includes('connection issue')
+  );
+  const recentHistory = cleanHistory.slice(-6); // Last 6 messages
 
   const messages: any[] = [
     { role: 'system', content: systemPrompt },
@@ -65,6 +72,7 @@ export async function sendChatMessage(
 
   let requestCount = 0;
   let toolCallCount = 0;
+  let hasRetriedToolUse = false;
   let finalChartSnapshot: ChartSnapshot | undefined;
   let lastAssistantText = '';
 
@@ -85,7 +93,7 @@ export async function sendChatMessage(
           messages,
           tools: GROQ_TOOLS,
           tool_choice: 'auto',
-          temperature: 0.2,
+          temperature: 0,
           max_tokens: 600,
         }),
         signal: overallController.signal,
@@ -109,10 +117,71 @@ export async function sendChatMessage(
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        // If tool_use_failed, stop tool loop and fallback
-        if (res.status === 400 && errorData?.error?.code === 'tool_use_failed' && step > 0) {
-          break;
+        console.error('Groq API Error:', res.status, JSON.stringify(errorData));
+
+        // Rule 7 from docs/04-AI-CHAT.md:
+        // "If Groq returns a tool-format error (400 tool_use_failed), retry once; if it fails again, answer in text only using a quick this-month summary."
+        if (
+          res.status === 400 &&
+          (errorData?.error?.code === 'tool_use_failed' || errorData?.error?.message)
+        ) {
+          if (step === 0 && !hasRetriedToolUse) {
+            hasRetriedToolUse = true;
+            messages.push({
+              role: 'system',
+              content: 'Please invoke the requested tool directly using native function calling.',
+            });
+            continue;
+          }
+
+          // Fallback: answer in text only using a quick this-month summary
+          try {
+            const summary = await executeSpendingSummary({});
+            const fallbackRes = await fetch(GROQ_API_URL, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: GROQ_MODEL,
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: userText },
+                  {
+                    role: 'system',
+                    content: `Spending summary for this month: Total spent: ₹${summary.total_spent_rupees}, Total income: ₹${summary.total_income_rupees}, Net balance change: ${summary.balance_change}, Transactions: ${summary.transaction_count}, Top expenses: ${summary.top_3_expense_categories.map((c: any) => `${c.category} (₹${c.total_rupees})`).join(', ') || 'None'}. Answer the user question in friendly Panda style using these numbers. Do not call any tools.`,
+                  },
+                ],
+                temperature: 0.2,
+                max_tokens: 300,
+              }),
+              signal: overallController.signal,
+            });
+
+            if (fallbackRes.ok) {
+              const fallbackData = await fallbackRes.json();
+              const fallbackText = fallbackData?.choices?.[0]?.message?.content;
+              if (fallbackText) {
+                clearTimeout(deadlineTimeout);
+                return { text: fallbackText };
+              }
+            }
+
+            // Direct text fallback if Groq call failed
+            clearTimeout(deadlineTimeout);
+            return {
+              text: `This month you spent ₹${summary.total_spent_rupees} and received ₹${summary.total_income_rupees}. ${
+                summary.top_3_expense_categories[0]
+                  ? `Your highest expense was ${summary.top_3_expense_categories[0].category} (₹${summary.top_3_expense_categories[0].total_rupees}).`
+                  : ''
+              }`,
+            };
+          } catch {
+            // continue to error return
+          }
         }
+
         clearTimeout(deadlineTimeout);
         return {
           text: "I'm a bit slow right now. Try again?",
@@ -165,6 +234,7 @@ export async function sendChatMessage(
         messages.push({
           role: 'tool',
           tool_call_id: call.id,
+          name: toolName,
           content: JSON.stringify(execution.result),
         });
       }
@@ -192,3 +262,4 @@ export async function sendChatMessage(
     };
   }
 }
+

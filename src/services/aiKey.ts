@@ -83,3 +83,4 @@ export async function testGroqApiKey(key: string): Promise<{ valid: boolean; err
     return { valid: false, error: err.message || 'Network error while testing key.' };
   }
 }
+

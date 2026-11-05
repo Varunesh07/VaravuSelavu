@@ -149,3 +149,4 @@ export async function deleteMessage(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM messages WHERE id = ?;', id);
 }
+
