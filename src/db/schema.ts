@@ -53,3 +53,4 @@ export const SCHEMA_V1_STATEMENTS = [
     value TEXT NOT NULL
   );`,
 ];
+

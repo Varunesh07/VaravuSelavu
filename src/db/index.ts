@@ -74,3 +74,4 @@ async function seedDefaultCategories(db: SQLite.SQLiteDatabase): Promise<void> {
     }
   }
 }
+

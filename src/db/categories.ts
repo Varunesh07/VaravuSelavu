@@ -84,3 +84,4 @@ export async function hideCategory(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('UPDATE categories SET hidden = 1 WHERE id = ?;', id);
 }
+

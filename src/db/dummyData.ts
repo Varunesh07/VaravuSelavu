@@ -138,3 +138,4 @@ export async function clearAllTransactions(): Promise<void> {
   await db.runAsync('DELETE FROM transactions;');
   useDataStore.getState().bumpDataVersion();
 }
+

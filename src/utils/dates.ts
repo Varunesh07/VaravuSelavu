@@ -184,3 +184,4 @@ export function shiftMonth(yearMonth: string, delta: number): string {
 
   return `${year}-${month.toString().padStart(2, '0')}`;
 }
+
