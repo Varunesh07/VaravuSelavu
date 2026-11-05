@@ -120,8 +120,9 @@ export async function chooseBackupFolder(): Promise<{
  */
 export async function exportDatabaseSnapshot(): Promise<BackupData> {
   const db = await getDatabase();
+  let result: BackupData | null = null;
 
-  return db.withTransactionAsync(async () => {
+  await db.withTransactionAsync(async () => {
     const categories = await db.getAllAsync<any>(
       'SELECT id, name, type, icon, color, sort_order, hidden FROM categories;'
     );
@@ -140,7 +141,7 @@ export async function exportDatabaseSnapshot(): Promise<BackupData> {
     const settings: Record<string, string> = {};
     if (theme) settings.theme = theme;
 
-    const data: BackupData = {
+    result = {
       app: 'varavuselavu',
       schema_version: CURRENT_SCHEMA_VERSION,
       exported_at: Date.now(),
@@ -150,9 +151,13 @@ export async function exportDatabaseSnapshot(): Promise<BackupData> {
       messages,
       settings,
     };
-
-    return data;
   });
+
+  if (!result) {
+    throw new Error('Database export failed: unable to read data tables');
+  }
+
+  return result;
 }
 
 /**
@@ -165,16 +170,34 @@ async function writeBackupToFolder(
   jsonString: string,
   options?: { rotatePrev?: boolean }
 ): Promise<string> {
+  if (typeof jsonString !== 'string' || !jsonString) {
+    throw new Error('Backup content is invalid: expected non-empty JSON string');
+  }
+
   const isSAF = folderUri.startsWith('content://') && StorageAccessFramework;
 
   if (isSAF) {
     // 1. Check existing files in folder
-    const files: string[] = await StorageAccessFramework.readDirectoryAsync(folderUri);
+    const files: string[] = (await StorageAccessFramework.readDirectoryAsync(folderUri)) || [];
 
-    // Helper to find file in SAF directory
-    const findUri = (name: string) => {
+    // Helper to find file in SAF directory (matches plain, base without ext, and url-encoded)
+    const findUri = (name: string): string | undefined => {
+      const baseName = name.replace(/\.json$/i, '');
       const encoded = encodeURIComponent(name);
-      return files.find((u) => u.endsWith(name) || u.endsWith(encoded) || u.includes(encoded));
+      const encodedBase = encodeURIComponent(baseName);
+      return files.find((u) => {
+        if (!u) return false;
+        const decoded = decodeURIComponent(u);
+        return (
+          u.endsWith(name) ||
+          u.endsWith(encoded) ||
+          u.includes(encoded) ||
+          u.includes(encodedBase) ||
+          decoded.endsWith(name) ||
+          decoded.includes(name) ||
+          decoded.includes(baseName)
+        );
+      });
     };
 
     const existingMainUri = findUri(fileName);
@@ -186,15 +209,19 @@ async function writeBackupToFolder(
         if (oldContent && oldContent.includes('"varavuselavu"')) {
           let prevUri = findUri(BACKUP_PREV_FILE_NAME);
           if (!prevUri) {
+            // Android SAF createFileAsync expects name WITHOUT extension
+            const cleanPrevName = BACKUP_PREV_FILE_NAME.replace(/\.json$/i, '');
             prevUri = await StorageAccessFramework.createFileAsync(
               folderUri,
-              BACKUP_PREV_FILE_NAME,
+              cleanPrevName,
               'application/json'
             );
           }
-          await StorageAccessFramework.writeAsStringAsync(prevUri, oldContent, {
-            encoding: (activeFs as any).EncodingType?.UTF8 || 'utf8',
-          });
+          if (prevUri && typeof prevUri === 'string') {
+            await StorageAccessFramework.writeAsStringAsync(prevUri, oldContent, {
+              encoding: (activeFs as any).EncodingType?.UTF8 || 'utf8',
+            });
+          }
         }
       } catch (rotateErr) {
         console.warn('Rotation to previous backup failed:', rotateErr);
@@ -204,11 +231,17 @@ async function writeBackupToFolder(
     // 3. Write target file
     let targetUri = existingMainUri;
     if (!targetUri) {
+      // Android SAF createFileAsync expects name WITHOUT extension
+      const cleanFileName = fileName.replace(/\.json$/i, '');
       targetUri = await StorageAccessFramework.createFileAsync(
         folderUri,
-        fileName,
+        cleanFileName,
         'application/json'
       );
+    }
+
+    if (!targetUri || typeof targetUri !== 'string') {
+      throw new Error(`Failed to create or obtain file URI for "${fileName}" in backup folder`);
     }
 
     await StorageAccessFramework.writeAsStringAsync(targetUri, jsonString, {
@@ -295,7 +328,13 @@ export async function executeBackup(options?: {
 
     // 3. Export snapshot
     const snapshot = await exportDatabaseSnapshot();
+    if (!snapshot) {
+      throw new Error('Database export returned empty snapshot');
+    }
     const jsonString = JSON.stringify(snapshot, null, 2);
+    if (!jsonString) {
+      throw new Error('Failed to serialize database snapshot');
+    }
 
     // 4. Write and verify with rotation
     await writeBackupToFolder(folderUri, BACKUP_FILE_NAME, jsonString, { rotatePrev: true });
@@ -343,7 +382,13 @@ export async function executePreResetBackup(): Promise<{
     const fileName = `varavuselavu-pre-reset-${today}.json`;
 
     const snapshot = await exportDatabaseSnapshot();
+    if (!snapshot) {
+      throw new Error('Database export returned empty snapshot');
+    }
     const jsonString = JSON.stringify(snapshot, null, 2);
+    if (!jsonString) {
+      throw new Error('Failed to serialize database snapshot');
+    }
 
     await writeBackupToFolder(targetFolder, fileName, jsonString, { rotatePrev: false });
 
