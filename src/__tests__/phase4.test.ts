@@ -116,7 +116,7 @@ describe('Phase 4: Settings, Backup, Reset Verification', () => {
     });
 
     test('Category with transactions cannot be hard deleted', () => {
-      const txCount = 5;
+      const txCount: number = 5;
       const canDelete = txCount === 0;
       expect(canDelete).toBe(false);
     });

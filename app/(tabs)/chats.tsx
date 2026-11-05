@@ -103,7 +103,7 @@ export default function ChatsScreen() {
         ]}
       >
         <View style={styles.avatar}>
-          <Panda reaction="happy" size={36} animated={false} />
+          <Panda reaction="happy" size={34} animated={false} />
         </View>
 
         <View style={styles.chatInfo}>

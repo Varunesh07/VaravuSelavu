@@ -113,4 +113,30 @@ describe('Phase 5: Panda Mascot & Polish Verification', () => {
       expect(batches10k.length).toBe(40); // 40 chunks of 250 = 10,000
     });
   });
+
+  describe('Chart Fallback Rules', () => {
+    test('Line chart with fewer than 3 points is converted to bar chart', () => {
+      const lineData1 = [{ label: 'Nov 01', value: 400 }];
+      const lineData2 = [
+        { label: 'Nov 01', value: 400 },
+        { label: 'Nov 02', value: 650 },
+      ];
+      const lineData3 = [
+        { label: 'Nov 01', value: 400 },
+        { label: 'Nov 02', value: 650 },
+        { label: 'Nov 03', value: 300 },
+      ];
+
+      const getEffectiveChartType = (type: string, dataLength: number) => {
+        return type === 'line' && dataLength < 3 ? 'bar' : type;
+      };
+
+      expect(getEffectiveChartType('line', lineData1.length)).toBe('bar');
+      expect(getEffectiveChartType('line', lineData2.length)).toBe('bar');
+      expect(getEffectiveChartType('line', lineData3.length)).toBe('line');
+      expect(getEffectiveChartType('pie', 1)).toBe('pie');
+      expect(getEffectiveChartType('bar', 1)).toBe('bar');
+    });
+  });
 });
+

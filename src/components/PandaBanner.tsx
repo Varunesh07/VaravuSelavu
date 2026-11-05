@@ -44,7 +44,7 @@ export function PandaBanner({ totalIncomePaise, totalExpensePaise }: PandaBanner
       ]}
     >
       <View style={styles.pandaWrapper}>
-        <Panda reaction={reaction} size={64} animated={true} />
+        <Panda reaction={reaction} size={76} animated={true} />
       </View>
       <View style={styles.textWrap}>
         <View style={styles.titleRow}>
@@ -65,14 +65,16 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
+    padding: 14,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 16,
+    overflow: 'visible',
   },
   pandaWrapper: {
-    marginRight: 12,
+    marginRight: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
   textWrap: {
     flex: 1,

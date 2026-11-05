@@ -53,3 +53,4 @@ Create-Icon "assets/favicon.png" 48 48 $true 0.85
 
 $pandaImg.Dispose()
 Write-Host "All icons generated successfully!"
+

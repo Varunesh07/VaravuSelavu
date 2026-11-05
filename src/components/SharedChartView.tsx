@@ -61,16 +61,31 @@ export function SharedChartView({
   const yAxisLabelWidth = 42;
   const plotAreaWidth = Math.max(160, containerWidth - yAxisLabelWidth - 8);
 
+  // Requirement: in AI chat and Home, if a line chart would have fewer than 3 points, draw a bar chart instead.
+  const isLineUnderThree = type === 'line' && lineData.length < 3;
+  const effectiveType = isLineUnderThree ? 'bar' : type;
+
+  const effectiveBarData: SharedChartBarItem[] =
+    isLineUnderThree && (!barData || barData.length === 0)
+      ? lineData.map((d) => ({
+          label: d.label,
+          value: d.value,
+          frontColor: colors.primary,
+        }))
+      : barData;
+
+  const effectiveLineData = isLineUnderThree ? [] : lineData;
+
   // Resolved X-axis title for bar and line
   const resolvedXAxisLabel =
     xAxisLabel ||
-    (type === 'bar'
-      ? barData.some((b) => b.label.match(/^\d{4}-\d{2}$/))
+    (effectiveType === 'bar'
+      ? effectiveBarData.some((b) => b.label.match(/^\d{4}-\d{2}$/))
         ? 'Month'
-        : barData.some((b) => b.label.match(/\d{2}-\d{2}/))
+        : effectiveBarData.some((b) => b.label.match(/\d{2}-\d{2}/))
         ? 'Date'
         : 'Category'
-      : lineData.some((l) => l.label.match(/^\d{4}-\d{2}$/))
+      : effectiveLineData.some((l) => l.label.match(/^\d{4}-\d{2}$/))
       ? 'Month'
       : 'Date');
 
@@ -312,7 +327,7 @@ export function SharedChartView({
       )}
 
       {/* -------------------- BAR CHART -------------------- */}
-      {type === 'bar' && (
+      {effectiveType === 'bar' && (
         <View style={styles.cartesianSection}>
           {/* Y-Axis Label Header */}
           <View style={styles.yAxisTitleRow}>
@@ -328,7 +343,7 @@ export function SharedChartView({
 
           {/* Bar Chart Component */}
           {(() => {
-            const count = barData.length;
+            const count = effectiveBarData.length;
             const barWidth = Math.max(
               10,
               Math.min(compact ? 16 : 20, Math.floor((plotAreaWidth / Math.max(1, count + 1)) * 0.55))
@@ -339,11 +354,11 @@ export function SharedChartView({
             );
             const totalBarsAndGaps = barWidth * count + spacing * Math.max(0, count - 1);
             const initialSpacing = Math.max(6, Math.floor((plotAreaWidth - totalBarsAndGaps) / 2));
-            const maxVal = Math.max(...barData.map((d) => d.value || 0), 0);
+            const maxVal = Math.max(...effectiveBarData.map((d) => d.value || 0), 0);
 
             return (
               <BarChart
-                data={barData.map((d) => ({
+                data={effectiveBarData.map((d) => ({
                   value: d.value,
                   label: d.label.length > 5 ? `${d.label.slice(0, 4)}.` : d.label,
                   frontColor: d.frontColor || d.color || colors.primary,
@@ -391,7 +406,7 @@ export function SharedChartView({
       )}
 
       {/* -------------------- LINE CHART -------------------- */}
-      {type === 'line' && (
+      {effectiveType === 'line' && (
         <View style={styles.cartesianSection}>
           {/* Y-Axis Label Header */}
           <View style={styles.yAxisTitleRow}>
@@ -407,7 +422,7 @@ export function SharedChartView({
 
           {/* Line Chart Component */}
           {(() => {
-            const count = lineData.length;
+            const count = effectiveLineData.length;
             const lineSpacing =
               count > 1
                 ? Math.max(12, Math.floor((plotAreaWidth - 24) / (count - 1)))
@@ -417,11 +432,11 @@ export function SharedChartView({
               Math.floor((plotAreaWidth - lineSpacing * Math.max(0, count - 1)) / 2)
             );
             const labelStep = count > 14 ? Math.ceil(count / 6) : count > 8 ? 2 : 1;
-            const maxVal = Math.max(...lineData.map((d) => d.value || 0), 0);
+            const maxVal = Math.max(...effectiveLineData.map((d) => d.value || 0), 0);
 
             return (
               <LineChart
-                data={lineData.map((d, index) => {
+                data={effectiveLineData.map((d, index) => {
                   const shouldShowLabel = index % labelStep === 0 || index === count - 1;
                   const labelText =
                     d.label.length > 5 ? `${d.label.slice(0, 4)}.` : d.label;

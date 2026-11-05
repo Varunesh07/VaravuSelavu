@@ -62,8 +62,8 @@ export async function executeToolCall(
 export async function executeSpendingSummary(rawArgs: any) {
   const parsed = SpendingSummaryArgsSchema.safeParse(rawArgs);
   const { from, to, adjustedNote } = normalizeDateRange(
-    parsed.success ? parsed.data.from : undefined,
-    parsed.success ? parsed.data.to : undefined
+    parsed.success ? parsed.data.from || undefined : undefined,
+    parsed.success ? parsed.data.to || undefined : undefined
   );
 
   const db = await getDatabase();
@@ -129,7 +129,7 @@ export async function executeSpendingSummary(rawArgs: any) {
 export async function executeCategoryBreakdown(rawArgs: any) {
   const parsed = CategoryBreakdownArgsSchema.safeParse(rawArgs);
   const args = parsed.success ? parsed.data : { from: undefined, to: undefined, type: 'expense' as const };
-  const { from, to, adjustedNote } = normalizeDateRange(args.from, args.to);
+  const { from, to, adjustedNote } = normalizeDateRange(args.from || undefined, args.to || undefined);
   const dbType = args.type === 'income' ? 'in' : 'out';
 
   const db = await getDatabase();
@@ -182,7 +182,7 @@ export async function executeTrend(rawArgs: any) {
   const args = parsed.success
     ? parsed.data
     : { from: undefined, to: undefined, group_by: 'day' as const, category: undefined };
-  const { from, to, adjustedNote } = normalizeDateRange(args.from, args.to);
+  const { from, to, adjustedNote } = normalizeDateRange(args.from || undefined, args.to || undefined);
 
   const db = await getDatabase();
   let query = `
@@ -253,7 +253,7 @@ export async function executeTransactions(rawArgs: any) {
   const args = parsed.success
     ? parsed.data
     : { from: undefined, to: undefined, category: undefined, search: undefined, sort: 'date_desc' as const, limit: 10 };
-  const { from, to, adjustedNote } = normalizeDateRange(args.from, args.to);
+  const { from, to, adjustedNote } = normalizeDateRange(args.from || undefined, args.to || undefined);
   const limit = Math.min(args.limit || 10, 15);
 
   const db = await getDatabase();
@@ -338,8 +338,8 @@ export async function executeComparePeriods(rawArgs: any) {
     ? parsed.data
     : { from_a: undefined, to_a: undefined, from_b: undefined, to_b: undefined };
 
-  const periodA = normalizeDateRange(args.from_a, args.to_a);
-  const periodB = normalizeDateRange(args.from_b, args.to_b);
+  const periodA = normalizeDateRange(args.from_a || undefined, args.to_a || undefined);
+  const periodB = normalizeDateRange(args.from_b || undefined, args.to_b || undefined);
 
   const db = await getDatabase();
 
@@ -448,7 +448,7 @@ export async function executeShowChart(rawArgs: any): Promise<{
         category: undefined,
       };
 
-  const { from, to } = normalizeDateRange(args.from, args.to);
+  const { from, to } = normalizeDateRange(args.from || undefined, args.to || undefined);
   let chartType = args.type;
 
   // Safety fix: Line chart grouped by category is invalid; fallback to bar
@@ -545,7 +545,7 @@ export async function executeShowChart(rawArgs: any): Promise<{
   const snapshot: ChartSnapshot = {
     type: chartType,
     title: args.title,
-    metric: args.metric,
+    metric: args.metric || 'expense',
     from,
     to,
     created_date: today,
