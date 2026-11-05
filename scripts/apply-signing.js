@@ -20,6 +20,10 @@ if (fs.existsSync(gradlePropsPath)) {
     'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1024m'
   );
 
+  // Increase network timeouts to prevent 504 gateway timeout on jar downloads
+  props += '\nsystemProp.org.gradle.internal.http.connectionTimeout=120000\n';
+  props += 'systemProp.org.gradle.internal.http.socketTimeout=120000\n';
+
   fs.writeFileSync(gradlePropsPath, props, 'utf8');
   console.log('Optimized android/gradle.properties (ARM architectures, 4GB heap).');
 }

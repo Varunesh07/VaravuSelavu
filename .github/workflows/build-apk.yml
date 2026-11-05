@@ -62,7 +62,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleRelease --no-daemon || (echo "Retrying Gradle build after network timeout..." && ./gradlew assembleRelease --no-daemon)
 
       - name: Package and Rename APK
         run: |
