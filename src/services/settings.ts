@@ -73,3 +73,4 @@ export async function getAllSettings(): Promise<AppSettings> {
     first_launch_prompted: map.get('first_launch_prompted') === '1',
   };
 }
+

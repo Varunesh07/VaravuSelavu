@@ -30,10 +30,17 @@ export function BackupReminderCard() {
 
   const handleChoose = async () => {
     setIsChoosing(true);
-    const res = await chooseBackupFolder();
-    setIsChoosing(false);
-    if (res.granted) {
-      setVisible(false);
+    try {
+      const res = await chooseBackupFolder();
+      if (res.granted) {
+        setVisible(false);
+      } else if (res.error) {
+        Alert.alert('Folder Selection Notice', res.error);
+      }
+    } catch (err: any) {
+      Alert.alert('Folder Selection Notice', err?.message || 'Could not select folder.');
+    } finally {
+      setIsChoosing(false);
     }
   };
 
@@ -141,3 +148,4 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
 });
+

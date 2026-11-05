@@ -172,10 +172,18 @@ export default function SettingsScreen() {
 
   // ---------------- Backup Handlers ----------------
   const handleChooseFolder = async () => {
-    const res = await chooseBackupFolder();
-    if (res.granted && res.directoryUri) {
-      setBackupFolder(res.directoryUri);
-      Alert.alert('Folder Selected', 'Backup directory configured successfully.');
+    try {
+      const res = await chooseBackupFolder();
+      if (res.granted && res.directoryUri) {
+        setBackupFolder(res.directoryUri);
+        Alert.alert('Folder Selected', 'Backup directory configured successfully.');
+      } else if (res.cancelled) {
+        // User cancelled picker
+      } else if (res.error) {
+        Alert.alert('Folder Selection Notice', res.error);
+      }
+    } catch (err: any) {
+      Alert.alert('Folder Selection Notice', err?.message || 'Could not select folder.');
     }
   };
 

@@ -1,13 +1,12 @@
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystemLegacy from 'expo-file-system/legacy';
+import * as FileSystemNew from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
-import { z } from 'zod';
 
 import { getDatabase } from '../db';
 import { CURRENT_SCHEMA_VERSION } from '../db/schema';
 import { getSetting, setSetting } from './settings';
 import { getTodayDateString } from '../utils/dates';
-import { useDataStore } from '../store/dataStore';
 import {
   BACKUP_FILE_NAME,
   BACKUP_PREV_FILE_NAME,
@@ -22,7 +21,13 @@ export {
   BackupData,
 };
 
-const { StorageAccessFramework } = FileSystem as any;
+// Access StorageAccessFramework from legacy or new expo-file-system
+const StorageAccessFramework =
+  (FileSystemLegacy as any)?.StorageAccessFramework ||
+  (FileSystemNew as any)?.StorageAccessFramework;
+
+// Active file system helper
+const activeFs = FileSystemLegacy || FileSystemNew;
 
 // Queue and lock states
 let isBackingUp = false;
@@ -56,30 +61,57 @@ export function cancelPendingBackups(): void {
 }
 
 /**
- * Prompts user to select a backup directory (SAF on Android).
+ * Prompts user to select a backup directory.
+ * On Android, opens the system StorageAccessFramework directory picker.
+ * On other platforms or fallback, uses Directory.pickDirectoryAsync or document directory.
  */
 export async function chooseBackupFolder(): Promise<{
   granted: boolean;
   directoryUri?: string;
+  cancelled?: boolean;
+  error?: string;
 }> {
-  if (Platform.OS === 'android' && StorageAccessFramework) {
+  // Strategy 1: Android StorageAccessFramework (native Android SAF folder picker)
+  if (Platform.OS === 'android' && StorageAccessFramework?.requestDirectoryPermissionsAsync) {
     try {
       const permissions = await StorageAccessFramework.requestDirectoryPermissionsAsync();
-      if (permissions.granted && permissions.directoryUri) {
+      if (permissions && permissions.granted && permissions.directoryUri) {
         await setSetting('backup_folder_uri', permissions.directoryUri);
         return { granted: true, directoryUri: permissions.directoryUri };
       }
-      return { granted: false };
-    } catch (err) {
-      console.error('SAF folder selection failed:', err);
-      return { granted: false };
+      if (permissions && !permissions.granted) {
+        return { granted: false, cancelled: true };
+      }
+    } catch (err: any) {
+      console.warn('SAF folder selection failed, trying fallback:', err);
     }
   }
 
-  // Non-android or fallback
-  const fallbackUri = (FileSystem as any).documentDirectory || '';
-  await setSetting('backup_folder_uri', fallbackUri);
-  return { granted: true, directoryUri: fallbackUri };
+  // Strategy 2: Modern expo-file-system Directory.pickDirectoryAsync
+  if (typeof (FileSystemNew as any)?.Directory?.pickDirectoryAsync === 'function') {
+    try {
+      const dir = await (FileSystemNew as any).Directory.pickDirectoryAsync();
+      if (dir && dir.uri) {
+        await setSetting('backup_folder_uri', dir.uri);
+        return { granted: true, directoryUri: dir.uri };
+      }
+    } catch (err: any) {
+      console.warn('Directory.pickDirectoryAsync fallback notice:', err);
+    }
+  }
+
+  // Strategy 3: Internal app documents folder fallback
+  const fallbackUri =
+    (FileSystemLegacy as any)?.documentDirectory ||
+    (FileSystemNew as any)?.documentDirectory ||
+    (FileSystemNew as any)?.Paths?.documentDirectory;
+
+  if (fallbackUri) {
+    await setSetting('backup_folder_uri', fallbackUri);
+    return { granted: true, directoryUri: fallbackUri };
+  }
+
+  return { granted: false, error: 'Could not open folder picker on this device.' };
 }
 
 /**
@@ -161,7 +193,7 @@ async function writeBackupToFolder(
             );
           }
           await StorageAccessFramework.writeAsStringAsync(prevUri, oldContent, {
-            encoding: (FileSystem as any).EncodingType?.UTF8 || 'utf8',
+            encoding: (activeFs as any).EncodingType?.UTF8 || 'utf8',
           });
         }
       } catch (rotateErr) {
@@ -180,7 +212,7 @@ async function writeBackupToFolder(
     }
 
     await StorageAccessFramework.writeAsStringAsync(targetUri, jsonString, {
-      encoding: (FileSystem as any).EncodingType?.UTF8 || 'utf8',
+      encoding: (activeFs as any).EncodingType?.UTF8 || 'utf8',
     });
 
     // 4. Verify read-back
@@ -199,11 +231,11 @@ async function writeBackupToFolder(
 
     if (options?.rotatePrev) {
       try {
-        const info = await (FileSystem as any).getInfoAsync?.(targetPath);
+        const info = await (activeFs as any).getInfoAsync?.(targetPath);
         if (info?.exists) {
-          const oldContent = await (FileSystem as any).readAsStringAsync?.(targetPath);
+          const oldContent = await (activeFs as any).readAsStringAsync?.(targetPath);
           if (oldContent) {
-            await (FileSystem as any).writeAsStringAsync?.(prevPath, oldContent);
+            await (activeFs as any).writeAsStringAsync?.(prevPath, oldContent);
           }
         }
       } catch (e) {
@@ -211,10 +243,10 @@ async function writeBackupToFolder(
       }
     }
 
-    await (FileSystem as any).writeAsStringAsync?.(targetPath, jsonString);
+    await (activeFs as any).writeAsStringAsync?.(targetPath, jsonString);
 
     // Verify read back
-    const readBack = await (FileSystem as any).readAsStringAsync?.(targetPath);
+    const readBack = await (activeFs as any).readAsStringAsync?.(targetPath);
     const parsed = JSON.parse(readBack);
     if (!parsed || parsed.app !== 'varavuselavu') {
       throw new Error('Backup write verification failed');
@@ -305,7 +337,7 @@ export async function executePreResetBackup(): Promise<{
     }
 
     const folderUri = await getSetting('backup_folder_uri');
-    const targetFolder = folderUri || (FileSystem as any).documentDirectory || '';
+    const targetFolder = folderUri || (activeFs as any).documentDirectory || '';
 
     const today = getTodayDateString();
     const fileName = `varavuselavu-pre-reset-${today}.json`;
@@ -338,12 +370,22 @@ export async function restoreFromFile(fileUri: string): Promise<{
   cancelPendingBackups();
 
   try {
-    // 1. Read JSON file
+    // 1. Read JSON file with dual SAF/standard fallback
     let content = '';
-    if (fileUri.startsWith('content://') && StorageAccessFramework) {
-      content = await StorageAccessFramework.readAsStringAsync(fileUri);
-    } else {
-      content = await (FileSystem as any).readAsStringAsync?.(fileUri);
+    try {
+      if (fileUri.startsWith('content://') && StorageAccessFramework) {
+        content = await StorageAccessFramework.readAsStringAsync(fileUri);
+      } else {
+        content = await (activeFs as any).readAsStringAsync(fileUri);
+      }
+    } catch {
+      try {
+        content = await (activeFs as any).readAsStringAsync(fileUri);
+      } catch {
+        if (StorageAccessFramework) {
+          content = await StorageAccessFramework.readAsStringAsync(fileUri);
+        }
+      }
     }
 
     if (!content) {
@@ -446,7 +488,8 @@ export async function restoreFromFile(fileUri: string): Promise<{
     });
 
     // 4. Update UI stores
-    useDataStore.getState().bumpDataVersion();
+    const { useDataStore } = await import('../store/dataStore');
+    useDataStore.getState().bumpDataVersion({ skipAutoBackup: true });
 
     return { ok: true };
   } catch (err: any) {
