@@ -379,3 +379,4 @@ export async function getLineChartData(period: ChartPeriod): Promise<LineChartPo
 
   return points;
 }
+
