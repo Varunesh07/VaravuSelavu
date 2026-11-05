@@ -1,7 +1,7 @@
 export const APP_VERSION = '1.0.0';
 export const APP_NAME = 'Varavuselavu';
 
-export const GROQ_MODEL = 'llama-3.3-70b-versatile';
+export const GROQ_MODEL = 'llama-3.1-8b-instant';
 export const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export interface DefaultCategory {

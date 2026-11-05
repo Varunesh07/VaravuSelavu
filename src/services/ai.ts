@@ -19,6 +19,57 @@ const MAX_STEPS = 3;
 const MAX_REQUESTS = 4;
 const MAX_TOOL_CALLS = 6;
 
+let cachedModel: string | null = null;
+
+/**
+ * Resolves the best available tool-capable model for the account.
+ */
+export async function resolveGroqModel(apiKey: string): Promise<string> {
+  if (cachedModel) return cachedModel;
+
+  try {
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const modelIds: string[] = (data.data || []).map((m: any) => m.id);
+      console.log('Available Groq models for account:', modelIds);
+
+      const PREFERRED = [
+        'llama-3.1-8b-instant',
+        'llama-3.3-70b-versatile',
+        'llama-3.3-70b-specdec',
+        'openai/gpt-oss-120b',
+        'openai/gpt-oss-20b',
+        'llama3-70b-8192',
+        'llama3-8b-8192',
+      ];
+
+      for (const pref of PREFERRED) {
+        if (modelIds.includes(pref)) {
+          cachedModel = pref;
+          console.log('Selected Groq model:', cachedModel);
+          return cachedModel;
+        }
+      }
+
+      const fallback =
+        modelIds.find((id) => id.includes('llama') || id.includes('gpt')) || modelIds[0];
+      if (fallback) {
+        cachedModel = fallback;
+        console.log('Fallback Groq model:', cachedModel);
+        return cachedModel;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch models list, using default:', err);
+  }
+
+  cachedModel = GROQ_MODEL;
+  return cachedModel;
+}
+
 /**
  * Sends a user message to Groq, executes tool calls locally, and returns the final answer.
  */
@@ -43,6 +94,9 @@ export async function sendChatMessage(
       needsKey: true,
     };
   }
+
+  // Resolve best available model
+  const activeModel = await resolveGroqModel(apiKey);
 
   // 3. Build initial conversation messages
   const systemPrompt = await buildSystemPrompt();
@@ -89,7 +143,7 @@ export async function sendChatMessage(
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: GROQ_MODEL,
+          model: activeModel,
           messages,
           tools: GROQ_TOOLS,
           tool_choice: 'auto',
@@ -119,6 +173,11 @@ export async function sendChatMessage(
         const errorData = await res.json().catch(() => ({}));
         console.error('Groq API Error:', res.status, JSON.stringify(errorData));
 
+        // If 404 model not found, reset cache
+        if (res.status === 404) {
+          cachedModel = null;
+        }
+
         // Rule 7 from docs/04-AI-CHAT.md:
         // "If Groq returns a tool-format error (400 tool_use_failed), retry once; if it fails again, answer in text only using a quick this-month summary."
         if (
@@ -144,7 +203,7 @@ export async function sendChatMessage(
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
-                model: GROQ_MODEL,
+                model: activeModel,
                 messages: [
                   { role: 'system', content: systemPrompt },
                   { role: 'user', content: userText },

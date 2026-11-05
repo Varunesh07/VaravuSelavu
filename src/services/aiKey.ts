@@ -30,7 +30,7 @@ export async function deleteGroqApiKey(): Promise<void> {
 }
 
 /**
- * Tests a Groq API key by making a minimal 1-token completion request.
+ * Tests a Groq API key by querying the models endpoint.
  */
 export async function testGroqApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
   const cleanKey = key.trim();
@@ -42,17 +42,11 @@ export async function testGroqApiKey(key: string): Promise<{ valid: boolean; err
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const res = await fetch(GROQ_API_URL, {
-      method: 'POST',
+    const res = await fetch('https://api.groq.com/openai/v1/models', {
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${cleanKey}`,
-        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 1,
-      }),
       signal: controller.signal,
     });
 
