@@ -206,19 +206,25 @@ async function writeBackupToFolder(
     if (options?.rotatePrev && existingMainUri) {
       try {
         const oldContent = await StorageAccessFramework.readAsStringAsync(existingMainUri);
-        if (oldContent && oldContent.includes('"varavuselavu"')) {
+        const cleanOld = oldContent.replace(/\0/g, '').trim();
+        if (cleanOld && cleanOld.includes('"varavuselavu"')) {
           let prevUri = findUri(BACKUP_PREV_FILE_NAME);
-          if (!prevUri) {
-            // Android SAF createFileAsync expects name WITHOUT extension
-            const cleanPrevName = BACKUP_PREV_FILE_NAME.replace(/\.json$/i, '');
-            prevUri = await StorageAccessFramework.createFileAsync(
-              folderUri,
-              cleanPrevName,
-              'application/json'
-            );
+          if (prevUri) {
+            try {
+              await StorageAccessFramework.deleteAsync(prevUri);
+            } catch (delPrevErr) {
+              console.warn('Could not delete old prev backup before rotate:', delPrevErr);
+            }
           }
-          if (prevUri && typeof prevUri === 'string') {
-            await StorageAccessFramework.writeAsStringAsync(prevUri, oldContent, {
+          // Android SAF createFileAsync expects name WITHOUT extension
+          const cleanPrevName = BACKUP_PREV_FILE_NAME.replace(/\.json$/i, '');
+          const newPrevUri = await StorageAccessFramework.createFileAsync(
+            folderUri,
+            cleanPrevName,
+            'application/json'
+          );
+          if (newPrevUri && typeof newPrevUri === 'string') {
+            await StorageAccessFramework.writeAsStringAsync(newPrevUri, cleanOld, {
               encoding: (activeFs as any).EncodingType?.UTF8 || 'utf8',
             });
           }
@@ -228,17 +234,22 @@ async function writeBackupToFolder(
       }
     }
 
-    // 3. Write target file
-    let targetUri = existingMainUri;
-    if (!targetUri) {
-      // Android SAF createFileAsync expects name WITHOUT extension
-      const cleanFileName = fileName.replace(/\.json$/i, '');
-      targetUri = await StorageAccessFramework.createFileAsync(
-        folderUri,
-        cleanFileName,
-        'application/json'
-      );
+    // 3. Write target file - delete existing file first so Android SAF creates a fresh, untruncated file
+    if (existingMainUri) {
+      try {
+        await StorageAccessFramework.deleteAsync(existingMainUri);
+      } catch (delMainErr) {
+        console.warn('Could not delete old backup before rewrite:', delMainErr);
+      }
     }
+
+    // Android SAF createFileAsync expects name WITHOUT extension
+    const cleanFileName = fileName.replace(/\.json$/i, '');
+    const targetUri = await StorageAccessFramework.createFileAsync(
+      folderUri,
+      cleanFileName,
+      'application/json'
+    );
 
     if (!targetUri || typeof targetUri !== 'string') {
       throw new Error(`Failed to create or obtain file URI for "${fileName}" in backup folder`);
@@ -248,9 +259,19 @@ async function writeBackupToFolder(
       encoding: (activeFs as any).EncodingType?.UTF8 || 'utf8',
     });
 
-    // 4. Verify read-back
-    const readBack = await StorageAccessFramework.readAsStringAsync(targetUri);
-    const parsed = JSON.parse(readBack);
+    // 4. Verify read-back (strip any null bytes and parse cleanly)
+    const rawReadBack = await StorageAccessFramework.readAsStringAsync(targetUri);
+    const readBack = (rawReadBack || '').replace(/\0/g, '').trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(readBack);
+    } catch {
+      const firstBrace = readBack.indexOf('{');
+      const lastBrace = readBack.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        parsed = JSON.parse(readBack.slice(firstBrace, lastBrace + 1));
+      }
+    }
     if (!parsed || parsed.app !== 'varavuselavu') {
       throw new Error('Backup write verification failed: corrupted output');
     }
@@ -279,8 +300,18 @@ async function writeBackupToFolder(
     await (activeFs as any).writeAsStringAsync?.(targetPath, jsonString);
 
     // Verify read back
-    const readBack = await (activeFs as any).readAsStringAsync?.(targetPath);
-    const parsed = JSON.parse(readBack);
+    const rawReadBack = await (activeFs as any).readAsStringAsync?.(targetPath);
+    const readBack = (rawReadBack || '').replace(/\0/g, '').trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(readBack);
+    } catch {
+      const firstBrace = readBack.indexOf('{');
+      const lastBrace = readBack.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        parsed = JSON.parse(readBack.slice(firstBrace, lastBrace + 1));
+      }
+    }
     if (!parsed || parsed.app !== 'varavuselavu') {
       throw new Error('Backup write verification failed');
     }
@@ -473,17 +504,29 @@ export async function restoreFromFile(fileUri: string): Promise<{
   try {
     // 1. Read JSON file with multi-layered safe reader
     const content = await readFileContentSafely(fileUri);
+    const sanitized = (content || '').replace(/\0/g, '').trim();
 
-    if (!content) {
+    if (!sanitized) {
       return { ok: false, error: 'Backup file is empty or cannot be read.' };
     }
 
     // 2. Parse and Validate
     let rawJson: any;
     try {
-      rawJson = JSON.parse(content);
+      rawJson = JSON.parse(sanitized);
     } catch {
-      return { ok: false, error: 'Selected file is not valid JSON.' };
+      // If parsing fails due to trailing corruption from older writes, extract outermost JSON object
+      const firstBrace = sanitized.indexOf('{');
+      const lastBrace = sanitized.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        try {
+          rawJson = JSON.parse(sanitized.slice(firstBrace, lastBrace + 1));
+        } catch {
+          return { ok: false, error: 'Selected file is not valid JSON.' };
+        }
+      } else {
+        return { ok: false, error: 'Selected file is not valid JSON.' };
+      }
     }
 
     const parsed = BackupDataSchema.safeParse(rawJson);
