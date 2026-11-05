@@ -52,7 +52,7 @@ export async function createCategory(
   const res = await db.runAsync(
     `INSERT INTO categories (name, type, icon, color, sort_order, hidden)
      VALUES (?, ?, ?, ?, ?, 0);`,
-    category.name,
+    category.name.trim(),
     category.type,
     category.icon,
     category.color,
@@ -62,7 +62,7 @@ export async function createCategory(
 }
 
 /**
- * Updates an existing category.
+ * Updates an existing category (e.g. rename, change color, icon, hidden).
  */
 export async function updateCategory(
   id: number,
@@ -85,3 +85,42 @@ export async function hideCategory(id: number): Promise<void> {
   await db.runAsync('UPDATE categories SET hidden = 1 WHERE id = ?;', id);
 }
 
+/**
+ * Unhides a previously hidden category.
+ */
+export async function unhideCategory(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('UPDATE categories SET hidden = 0 WHERE id = ?;', id);
+}
+
+/**
+ * Gets the number of transactions associated with a category.
+ */
+export async function getCategoryTransactionCount(categoryId: number): Promise<number> {
+  const db = await getDatabase();
+  const row = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM transactions WHERE category_id = ?;',
+    categoryId
+  );
+  return row?.count || 0;
+}
+
+/**
+ * Deletes a category if it is not used in any transactions.
+ * If used, returns success: false.
+ */
+export async function deleteCategory(
+  categoryId: number
+): Promise<{ success: boolean; error?: string }> {
+  const count = await getCategoryTransactionCount(categoryId);
+  if (count > 0) {
+    return {
+      success: false,
+      error: `Category is used in ${count} transaction(s). You can hide it instead.`,
+    };
+  }
+
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM categories WHERE id = ?;', categoryId);
+  return { success: true };
+}

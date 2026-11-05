@@ -23,6 +23,8 @@ import { PandaBanner } from '../../src/components/PandaBanner';
 import { CategoryTiles } from '../../src/components/CategoryTiles';
 import { ChartCard } from '../../src/components/ChartCard';
 import { RecentTransactions } from '../../src/components/RecentTransactions';
+import { BackupReminderCard } from '../../src/components/BackupReminderCard';
+import { FirstLaunchRestoreModal } from '../../src/components/FirstLaunchRestoreModal';
 import { formatDisplayDate, getTodayDateString } from '../../src/utils/dates';
 
 export default function HomeScreen() {
@@ -88,6 +90,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <FirstLaunchRestoreModal />
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingHorizontal: spacing.screenPadding }]}
@@ -110,6 +113,9 @@ export default function HomeScreen() {
             </Text>
           </View>
         </View>
+
+        {/* Gentle Backup Folder Reminder Card */}
+        <BackupReminderCard />
 
         {/* 1. BalanceCard (Purple wave gradient with usage bar logic) */}
         <BalanceCard

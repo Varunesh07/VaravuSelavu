@@ -10,6 +10,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../src/theme';
+import { useThemeStore } from '../src/store/themeStore';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync().catch(() => {
@@ -25,6 +26,10 @@ export default function RootLayout() {
   });
 
   const { colors, isDark } = useTheme();
+
+  useEffect(() => {
+    useThemeStore.getState().initTheme();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
